@@ -120,6 +120,12 @@ const EXTENDED_TIMEOUT_METHODS = new Set([
 // Extended timeout for batch/query operations (2 minutes)
 const EXTENDED_API_TIMEOUT_MS = 120000;
 
+const LWC_REQUEST_TYPE = 'appgrid:apex:request';
+const LWC_RESPONSE_TYPE = 'appgrid:apex:response';
+
+
+
+
 export class ApiTimeoutError extends Error {
   public methodName: string;
   public timeoutMs: number;
@@ -135,58 +141,132 @@ export class ApiTimeoutError extends Error {
 export class SfdcClient implements APIClient {
   constructor() {}
 
+  private pendingApex = new Map<
+  string,
+  {
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }
+>();
+
+private lwcListenerBound = false;
+
+private ensureLwcListener() {
+  if (this.lwcListenerBound) return;
+
+  window.addEventListener('message', (event: MessageEvent) => {
+    const data = event.data;
+    if (!data || data.type !== LWC_RESPONSE_TYPE || !data.requestId) return;
+
+    const pending = this.pendingApex.get(data.requestId);
+    if (!pending) return;
+
+    clearTimeout(pending.timer);
+    this.pendingApex.delete(data.requestId);
+
+    if (data.ok) pending.resolve(data.result);
+    else pending.reject(new Error(data.error || 'Unknown Apex bridge error'));
+  });
+
+  this.lwcListenerBound = true;
+}
+
+private async callApex(methodName: string, params?: any): Promise<any> {
+  this.ensureLwcListener();
+
+  const timeoutMs = EXTENDED_TIMEOUT_METHODS.has(methodName)
+    ? EXTENDED_API_TIMEOUT_MS
+    : DEFAULT_API_TIMEOUT_MS;
+
+  const requestId =
+    (globalThis.crypto?.randomUUID?.() ??
+      `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      this.pendingApex.delete(requestId);
+      reject(new ApiTimeoutError(methodName, timeoutMs));
+    }, timeoutMs);
+
+    this.pendingApex.set(requestId, { resolve, reject, timer });
+
+    window.parent.postMessage(
+      {
+        type: LWC_REQUEST_TYPE,
+        requestId,
+        methodName,
+        params
+      },
+      '*' // optionally replace with exact Salesforce origin
+    );
+  }).catch((error) => {
+    if (error instanceof ApiTimeoutError) {
+      prettyPrint(
+        '[sfdcClient] API timeout',
+        { methodName, timeoutMs, params: params ? Object.keys(params) : 'none' },
+        'red'
+      );
+    }
+    throw error;
+  });
+}
+
+
+
+
   /**
    * A private helper to centralize all calls to the Aura component's Apex bridge.
    * This ensures consistency in error handling and parameter passing.
    * @param methodName The name of the Apex method to call (e.g., 'getMetadata').
    * @param params An object containing the parameters for the Apex method.
    */
-  private async callApex(methodName: string, params?: any): Promise<any> {
-    // The Aura helper now guarantees `handleRequestFromReact` is available on the window
-    // object before the React application is mounted.
-    if (typeof window.handleRequestFromReact !== 'function') {
-      const errorMsg = 'Aura communication channel is not available.';
-      prettyPrint('[sfdcClient] callApex error', { methodName, errorMsg }, 'red');
-      return Promise.reject(new Error(errorMsg));
-    }
+  // private async callApex(methodName: string, params?: any): Promise<any> {
+  //   // The Aura helper now guarantees `handleRequestFromReact` is available on the window
+  //   // object before the React application is mounted.
+  //   if (typeof window.handleRequestFromReact !== 'function') {
+  //     const errorMsg = 'Aura communication channel is not available.';
+  //     prettyPrint('[sfdcClient] callApex error', { methodName, errorMsg }, 'red');
+  //     return Promise.reject(new Error(errorMsg));
+  //   }
 
-    // Determine timeout based on method type
-    const timeoutMs = EXTENDED_TIMEOUT_METHODS.has(methodName)
-      ? EXTENDED_API_TIMEOUT_MS
-      : DEFAULT_API_TIMEOUT_MS;
+  //   // Determine timeout based on method type
+  //   const timeoutMs = EXTENDED_TIMEOUT_METHODS.has(methodName)
+  //     ? EXTENDED_API_TIMEOUT_MS
+  //     : DEFAULT_API_TIMEOUT_MS;
 
-    // Track timeout ID for cleanup
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  //   // Track timeout ID for cleanup
+  //   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // Create a timeout promise that rejects after the specified duration
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new ApiTimeoutError(methodName, timeoutMs));
-      }, timeoutMs);
-    });
+  //   // Create a timeout promise that rejects after the specified duration
+  //   const timeoutPromise = new Promise<never>((_, reject) => {
+  //     timeoutId = setTimeout(() => {
+  //       reject(new ApiTimeoutError(methodName, timeoutMs));
+  //     }, timeoutMs);
+  //   });
 
-    // Race the actual API call against the timeout
-    try {
-      const result = await Promise.race([
-        window.handleRequestFromReact(methodName, params),
-        timeoutPromise
-      ]);
-      // Clear timeout on success
-      if (timeoutId) clearTimeout(timeoutId);
-      return result;
-    } catch (error) {
-      // Clear timeout on error (may have already fired, but safe to call)
-      if (timeoutId) clearTimeout(timeoutId);
-      if (error instanceof ApiTimeoutError) {
-        prettyPrint('[sfdcClient] API timeout', {
-          methodName,
-          timeoutMs,
-          params: params ? Object.keys(params) : 'none'
-        }, 'red');
-      }
-      throw error;
-    }
-  }
+  //   // Race the actual API call against the timeout
+  //   try {
+  //     const result = await Promise.race([
+  //       window.handleRequestFromReact(methodName, params),
+  //       timeoutPromise
+  //     ]);
+  //     // Clear timeout on success
+  //     if (timeoutId) clearTimeout(timeoutId);
+  //     return result;
+  //   } catch (error) {
+  //     // Clear timeout on error (may have already fired, but safe to call)
+  //     if (timeoutId) clearTimeout(timeoutId);
+  //     if (error instanceof ApiTimeoutError) {
+  //       prettyPrint('[sfdcClient] API timeout', {
+  //         methodName,
+  //         timeoutMs,
+  //         params: params ? Object.keys(params) : 'none'
+  //       }, 'red');
+  //     }
+  //     throw error;
+  //   }
+  // }
 
   async cloneAppGridConfig(params: {
     userId: string;
