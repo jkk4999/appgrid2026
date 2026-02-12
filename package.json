@@ -165,6 +165,8 @@
     "vite-plugin-svgr": "^4.5.0"
   },
   "browserslist": [
-    "extends browserslist-config-baseline"
+    "defaults",
+    "not IE 11",
+    "maintained node versions"
   ]
 }
