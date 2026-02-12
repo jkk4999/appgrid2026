@@ -1,0 +1,18 @@
+In this video, we will review how each user can configure app-grid to show their object and relationship preferences.  
+
+By default, unless the user (or their system admin) has configured their object preferences, the object selector will show all objects the user has permissions to view.
+
+For the best user experience, we recommend that each user define what objects (and relationships) they wish to see in the grid toolbar object selector.  
+
+To open the object preferences wizard, click the ellipse button in the toolbar and select Objects from the dropdown menu.  In the preferences panel, select the Objects tab.  Check the objects you will use frequently in your workflows and uncheck the rest.  The object selector will now allow you to navigate between your preferred objects.
+
+The ability to view the object preferences button is determined by a grid permission assignment.  See the 'configure grid permissions' video for more information.
+
+Contact us via email at info@appGridSoftware.com or visit our website www.appGridSoftware.com.  
+
+Thank you for watching.
+
+
+
+
+

@@ -1,0 +1,37 @@
+In this video, we will review how each user can configure and use the app-grid kanban view.  
+
+app-grid is a native lightning web component application that delivers powerful query, filtering, presentation and personalization features that delight users and increase productivity. 
+
+the kanban view is ideal for displaying data that flows through various states and when you want to see your data organized and presented by state.  sales orders, opportunities or project tasks are good examples of this.
+
+One of the unique and really useful features of the app-grid kanban view is it's ability to display related data.  More on that in a bit.
+
+let's select the orders object and select the kanban view from the view selector.  notice that a warning message appears that a kanban configuration was not found.
+
+the kanban view requires a configuration in order to display the users preferences for what data fields are shown in the kanban card. 
+
+click the kanban settings menu button to open the kanban configuration panel.
+
+for the Content I D field, select the Object I D field.  the Content I D field must be unique across all records.  for example, if we are displaying Orders, we would choose the Order I D field.
+
+for the Column field, choose the field that represents your state.  for Orders, we would choose the Status field.  the kanban view will create a column for each unique order status value.
+
+there are 3 content fields which determine what data fields are shown in the kanban card.  only the first one is required.  choose whatever fields are desired to display in the kanban card.  we will select the order number, account I D and order start date fields.
+
+the group by field is optional.  choosing a value for this field will result in column groups being displayed.
+
+click the save button.
+
+to change the state of a card, drag it to the desired column.
+
+to edit a card, double click the item.  an edit form will be displayed that represents the underlying record.  edit fields as required and click save when finished.  note, you can also clone a record if desired.
+
+as mentioned, the kanban view can display related data.  click on a kanban record and then click on the display related data button.  one or more grids will be displayed based on your relation preferences for this object.  in our example, we had previously defined the order products relation preference for our list view, so we see 1 grid displayed that shows the related order products for the selected card.  we can easily change what relationships are displayed by clicking the object preferences button.
+
+the full range of grid features are available to display, edit, sort and filter as required.  see the grid video's for more information on how to use the various grid features.
+
+to sort the kanban view, select the sort field from the dropdown selector.  chose ascending or descending as required.
+
+to perform a search, enter the search value into the search field in the kanban toolbar.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@appGridSoftware.com or visit our website.  Thank you for watching.

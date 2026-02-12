@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>AppGrid</title>
+
+    <!-- Google Fonts are stripped from Syncfusion CSS at build time by vite.config.aura.js -->
+    <!-- No runtime interception needed -->
+
+    <style media="only screen">
+      :root,
+      body,
+      #root {
+        height: 100vh; /* Full viewport height */
+        width: 100vw; /* Full viewport width */
+        margin: 0;
+        box-sizing: border-box;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      html {
+        position: absolute;
+        top: 0;
+        left: 0;
+        padding: 0;
+        overflow: auto;
+        font-family:
+          -apple-system, 'system-ui', 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, 'Noto Sans', 'Liberation Sans', sans-serif,
+          'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+          'Noto Color Emoji';
+      }
+
+      body {
+        padding: 0px;
+        overflow: auto;
+        background-color: transparent;
+      }
+
+      /* Hide codesandbox highlighter */
+      body > #highlighter {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

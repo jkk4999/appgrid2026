@@ -1,0 +1,1 @@
+AppGridController.invalidateAllMetadata();

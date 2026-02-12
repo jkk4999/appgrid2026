@@ -1,0 +1,22 @@
+export const sfdcDataTypes = [
+  "BOOLEAN",
+  "COMBOBOX",
+  "CURRENCY",
+  "DATE",
+  "DATETIME",
+  "DECIMAL",
+  "DOUBLE",
+  "EMAIL",
+  "ENCRYPTEDSTRING",
+  "ID",
+  "INTEGER",
+  "LONG",
+  "MULTIPICKLIST",
+  "PERCENT",
+  "PHONE",
+  "PICKLIST",
+  "REFERENCE",
+  "STRING",
+  "TIME",
+  "URL"
+];

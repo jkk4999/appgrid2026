@@ -1,0 +1,14 @@
+In this video, we will demonstrate the pivot view functionality of appGrid.
+
+app-grid is a native lightning web component application that delivers powerful query, filtering, presentation and personalization features that delight users and increase productivity.  
+
+Creating pivot views involves transforming raw data into an interactive, summarized format that allows users to analyze and explore data across various dimensions.  A well-configured pivot view makes it easy to slice and dice data, spot trends, compare categories, and make informed decisions based on the patterns revealed.
+
+typically, to display data in a pivot view requires creating a Salesforce report or data cube to group and aggregrate the data.  appGrid provides the ability for users to dynamically create pivot views using our view wizard.
+
+in the current view, we are displaying all accounts owned by me.  to create a pivot view, click on the grid settings button in the toolbar.  click on the apπ settings tab.  from the dropdown, select new pivot view.  let's change the name to Revenue by Industry and Type.
+
+the first step in creating a pivot view is to choose the pivot columns.  let's select the Account Type field.
+
+next, we will select the row groups.  let's choose Industry.
+

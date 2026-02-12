@@ -1,0 +1,33 @@
+In this video, we will demonstrate the query capabilities of app-grid.  app-grid is a native lightning web component application that delivers powerful query, filtering, presentation and personalization features that delight users and increase productivity.  
+
+The app-grid query builder enables users to easily create complex queries using a graphical user interface.  
+
+In the current view, we are displaying the 'open orders' query that displays all orders that have not been delivered.  Let's create a new query to display all open orders for the current month. 
+
+Click the search button in the grid menu to open the query builder.  The query builder displays the selected query definition.
+
+We already have a query condition defined for the order status.  To create a new query clause, click the plus button and select 'Add condition'.  Whenever we have more than 1 query clause, we can select the logical operator which defines how the query clauses will be evaluated.  For our purposes, the 'AND' operator is what we want.
+
+Depending on the type of the field selected, the values displayed for the operator options field and the editor for the value field will vary based on what's appropriate for the selected field data type.
+
+In the first dropdown selector, select the 'Order Start Date' field', select the 'Greater than or equal' query operator and select the first day of the month for the value. 
+
+We will click the 'Save As' button and enter 'Open orders this month' for the query name and click 'Submit'.  Let's run the new query by selecting 'Open orders this month' from the query selector.
+
+Click on the query builder button in the grid menu to open the query builder. 
+
+The app-grid query builder provides the ability to create hierarchical queries.  This is a very powerful feature that enables creation of complex query rules.  What this means is that a given query rule can contain other query rules.  There is no limit to the level of query rule nesting, but in practical terms, 1 or 2 levels is sufficient to define most business queries. See the 'Creating hierarchical queries' video for more information.
+
+A sub-query adds additional filtering logic to the query.  For example, if we are viewing Orders, we might want to define a query that returns only those Orders that have an Order Item for a certain product.  Let's create a new query that returns all orders which include a MacBook Pro 16 product.
+
+ Click on the SubQuery tab.  Select the relation that the sub-query will operate on.  In this case, we will select the 'Order Product' relation.  Note, the relations that are displayed are dependent on the Object preferences that have been selected.  See the 'Configuring object preferences' video for more information on how to define your Object preferences.
+
+Click the plus icon and select 'Add condition'.  Select 'Product Id' for the field.  Select 'equals' for the operator.  Let's select MacBook Pro 16 for the value.  Start typing mac into the value text box.  Select 'MacBook Pro 16' from the values list.
+
+Let's save this as a new query.  Click the 'Save-As' button and enter 'MacBook Pro 16 orders' for the query name.  Now lets run this query and test the result.  Select 'MackBook Pro 16 orders' from the query selector.  The query results are displayed.  Click the display related data icon on one of the order records.  Notice that one of the Order Item records has a product of type MacBook Pro 16.
+
+Sub-queries are a powerful feature of app-grid, as it enables users to return the exact records needed to support a business process and eliminate the need to scroll though records not of interest.
+
+This was a relatively simple example, however it would have been easy to add more query conditions to the main or sub-query rules to implement complex query rules.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@appgridsoftware.com or visit our website.  Thank you for watching.

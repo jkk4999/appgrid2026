@@ -1,0 +1,2391 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SubgridCore
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * PURPOSE:
+ * Detail grid component for displaying related records in a master-detail
+ * relationship. Renders as an expandable row within the main AppGrid,
+ * providing full grid functionality (views, filters, editing, tree mode)
+ * for child records of the selected parent row.
+ *
+ * ARCHITECTURE:
+ * - Parent: DetailCellRenderer.tsx (AG Grid detail cell renderer)
+ * - State: Zustand store with 'subgrid' context for isolated state management
+ * - API: Shares apiClient from parent for Salesforce Apex communication
+ * - Grid: AG Grid Enterprise with same feature set as main grid
+ *
+ * KEY DEPENDENCIES:
+ * - AG Grid Enterprise for grid rendering
+ * - Zustand store with subgrid-specific selectors (useGridViewState, etc.)
+ * - GridProvider context for subgrid identity
+ * - Shared hooks (useGridEvents, useFilterTemplates, useRecordSaver, etc.)
+ *
+ * USAGE:
+ * Rendered by DetailCellRenderer when a master row is expanded.
+ * Receives relation metadata, parent row data, and shared maps from parent.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/*==========================================
+** MODULE-LEVEL STATE
+** These survive across React StrictMode unmount/remount cycles
+==========================================*/
+
+
+// Track which relations are currently loading (persists across component instances)
+const loadingRelationsSet = new Set<string>();
+
+/*==========================================
+** IMPORTS
+==========================================*/
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+// Zustand
+import useStore from '../../zustandStore';
+
+// Context
+import { GridProvider } from '../../context/GridContext';
+
+// Domain-specific selector hooks - using unified context-based hooks
+import {
+  useThemeState,
+  useRecordTypeState,
+  // Unified context-based hooks
+  useGridViewState,
+  useGridFilterState,
+  useGridPivotState,
+  useGridDialogState,
+  useGridGridTypeState,
+} from '../../hooks/selectors';
+
+import { useShallow } from 'zustand/react/shallow';
+
+// Ag-Grid
+import type { AdvancedFilterModel, ColDef, ColumnMovedEvent, FilterModel, FirstDataRenderedEvent, GridApi, GridOptions, RowSelectedEvent } from 'ag-grid-community';
+
+import { AgGridReact } from 'ag-grid-react';
+
+import { createAgGridColumns } from '../../gridMethods/createAgGridColumns';
+
+// Interfaces
+import { SelectedFilterType } from '../../appInterfaces/grid/gridInterfaces';
+
+// PubSub
+import PubSub from 'pubsub-js';
+
+// hooks
+import useAddGridRow, { GuardResult } from '../../hooks/useAddGridRow';
+
+import { useAgGridApi } from '../../hooks/grid/useAgGridApi';
+
+import { useChangedRows } from '../../hooks/useChangedRows';
+
+import { useDeleteHandlers } from '../../hooks/useDeleteHandlers';
+
+import { useErrorColumn } from '../../hooks/grid/useErrorColumn';
+
+import { useFilterTemplates } from '../../hooks/useFilterTemplates';
+
+import { useFormatter } from '../../utilities/useFormatters';
+
+import { useGridContainer } from '../../hooks/useGridContainer';
+
+import { useGridId } from '../../hooks/useGridId';
+
+import { useGridEvents } from '../../hooks/useGridEvents';
+
+import { useGridStatePersistence } from '../../hooks/useGridStatePersistence';
+
+import { useGridToolbarEvents } from '../../hooks/useGridToolbarEvents';
+
+import { useRecordSaver } from '../../hooks/useRecordSaver';
+
+import { useSnackbarAction } from '../../hooks/useSnackbarAction';
+
+import { useViewUpserts } from '../../viewState/useViewUpserts';
+
+import { useGridPrefs } from '../../hooks/useGridPrefs';
+
+// utilities
+import { buildFieldTypeMap, decodeAndConvertRecords } from '../../utilities/decodeAndConvert';
+
+import { prettyPrint } from '../../utilities/prettyPrint';
+
+// MUI
+import { Box, Button } from '@mui/material';
+
+// Theme
+import { useTheme } from '@mui/material/styles';
+
+// components
+import AgColumnManager from '../appGridAuraComponent/customColumnPanel/AgColumnManager';
+
+import ColumnsProxyToolPanel from './ColumnsProxyToolPanel';
+
+import CreateFilterDialog from '../saveFilterDialog/CreateFilterDialog';
+
+import CreateTemplateDialog from '../createTemplateDialog/CreateTemplateDialog';
+
+// Unified confirmation dialog (replaces DeleteFilterDialog, DeleteRecordDialog, DeleteTemplateDialog)
+import { useConfirmationDialog, confirmationPresets } from '../../hooks/useConfirmationDialog';
+
+import { GridEditDialog } from '../gridEditDialog/gridEditDialog';
+
+import LoadingIndicator from '../loadingIndicator/LoadingIndicator';
+
+import RecordTypeDialog from '../recordTypeDialog/RecordTypeDialog';
+
+import SubgridToolbar from './SubgridToolbar';
+
+import { SubgridViewSelector } from './subgridViewSelector';
+
+import { AdvancedFilterBuilder } from '../advancedFilterBuilder';
+
+import { MassEditDialog } from '../massEditDialog';
+
+import { createDefaultRowSelection } from '../../grid/config/gridConfig';
+
+import { emitRefreshSubgridQuery } from '../../events/topics';
+
+
+// types
+import type { SObjectFieldMetadata, SObjectMetadata, SObjectPermission, SObjectView } from '../../sObjectMetadataTypes';
+
+
+/*==========================================
+** TYPES & INTERFACES
+==========================================*/
+
+interface SubgridCoreProps {
+  apiClient: any;
+  nameFieldMap: Map<string, string>;
+  objectsWithoutNameFieldMap: Map<string, string>;
+  objFieldPermissionsMap: React.RefObject<Map<string, any>>;
+  objMetadataMap: React.RefObject<Map<string, SObjectMetadata>>;
+  objPermissionsMap?: React.RefObject<Map<string, SObjectPermission>>;
+  relation: any; // RelationPreference
+  selectedParentRow: Record<string, any>;
+  /** Whether this subgrid's tab is currently active/visible */
+  isActive?: boolean;
+  completedRelationsSet: Set<string>;
+}
+
+/*==========================================
+** CONSTANTS
+==========================================*/
+
+// Persist last-saved TreeGrid prefs fingerprint across mounts to avoid save loops
+const lastTreePrefsKey = new Map<string, string>();
+
+// Track whether we've already fetched prefs for a given object in this session (avoid repeated fetch+snackbar)
+const fetchedTreePrefsFor = new Set<string>();
+
+/*==========================================
+** COMPONENT
+==========================================*/
+
+const SubgridCore: React.FC<SubgridCoreProps> = ({
+  apiClient,
+  nameFieldMap,
+  objectsWithoutNameFieldMap,
+  objFieldPermissionsMap,
+  objMetadataMap,
+  relation,
+  selectedParentRow,
+  isActive = true
+}) => {
+  const relationName = relation?.name || '';
+
+  const zustandRef = useRef(useStore);
+
+  /*==========================================
+  ** CONTEXT
+  ==========================================*/
+  const theme = useTheme();
+
+  /*==========================================
+  ** CUSTOM HOOKS
+  ==========================================*/
+  const { gridApi, gridApiRef, onGridReady } = useAgGridApi();
+
+  const { enqueueSnackbar, action, closeSnackbar } = useSnackbarAction();
+
+  const { showConfirmation } = useConfirmationDialog();
+
+  /*==========================================
+  ** GLOBAL STATE (Zustand)
+  ==========================================*/
+  // All hooks use 'subgrid' context to access subgrid-specific state
+
+  // Theme state (shared across contexts)
+  const { selectedTheme } = useThemeState();
+
+  // Per-relation view state from Zustand store
+  // We ONLY use per-relation state - global state causes race conditions when switching tabs
+  const subgridViewByRelation = useStore((state) => state.subgridViewByRelation);
+
+  const setSubgridViewForRelation = useStore((state) => state.setSubgridViewForRelation);
+
+  const setSubgridViewOptionsForRelation = useStore((state) => state.setSubgridViewOptionsForRelation);
+
+  // Keep legacy setters for backward compatibility with other code that still uses them
+  // But these now only update the global state (not used for display)
+  const {
+    setSelectedView: setSelectedSubgridView,
+    setViewOptions: setSubgridViewOptions,
+  } = useGridViewState('subgrid');
+
+  // Subgrid filter state - using unified hook with 'subgrid' context
+  const {
+    filterOptions: subgridFilterOptions,
+    setFilterOptions: setSubgridFilterOptions,
+    selectedFilter: selectedSubgridFilter,
+    setSelectedFilter: setSelectedSubgridFilter,
+    setIsFilterActive: setIsSubgridFilterActive,
+    showAdvancedFilter: showSubgridAdvancedFilter,
+    setShowAdvancedFilter: setShowSubgridAdvancedFilter,
+  } = useGridFilterState('subgrid');
+
+  // Subgrid dialog state - using unified hook with 'subgrid' context
+  const {
+    showCreateFilterDialog: showSubgridCreateFilterDialog,
+    showCreateTemplateDialog: showSubgridCreateTemplateDialog,
+    setShowCreateTemplateDialog: setShowSubgridCreateTemplateDialog,
+  } = useGridDialogState('subgrid');
+
+  // Subgrid grid type state - using unified hook with 'subgrid' context
+  const { selectedGridType: selectedSubgridType } = useGridGridTypeState('subgrid');
+
+  // Subgrid pivot state - using unified hook with 'subgrid' context
+  const { pivotMode: subgridPivotMode, setPivotMode } = useGridPivotState('subgrid');
+
+  // Note: Subgrid style and calculated column state are accessed directly via useStore.getState()
+  // in the getExtras() callback to ensure fresh values at save time. However, we do need to
+  // subscribe to column styles to trigger cell refresh when styles are toggled.
+  const objSubgridColumnStyles = useStore((state) => state.objSubgridColumnStyles);
+
+  // Record type state
+  const { showRecordTypeDialog } = useRecordTypeState();
+
+  // Remaining state from direct store access - consolidated with useShallow for performance
+  const {
+    gridEditDialogState,
+    setGridEditDialogState,
+    orgObjects,
+    selectedObject,
+    subgridTreeGridPreferences,
+    subgridTreeGridPreferenceRecId,
+    setSelectedSlackRow,
+    setExclusivePanel,
+    setSubgridTreeGridPreferences,
+    setSubgridTreeGridPreferenceRecId,
+  } = useStore(useShallow((state) => ({
+    gridEditDialogState: state.gridEditDialogState,
+    setGridEditDialogState: state.setGridEditDialogState,
+    orgObjects: state.orgObjects,
+    selectedObject: state.selectedObject,
+    subgridTreeGridPreferences: state.subgridTreeGridPreferences,
+    subgridTreeGridPreferenceRecId: state.subgridTreeGridPreferenceRecId,
+    setSelectedSlackRow: state.setSelectedSlackRow,
+    setExclusivePanel: state.setExclusivePanel,
+    setSubgridTreeGridPreferences: state.setSubgridTreeGridPreferences,
+    setSubgridTreeGridPreferenceRecId: state.setSubgridTreeGridPreferenceRecId,
+  })));
+
+  const relationTreePrefsEntry = useStore(
+    useCallback(
+      (state) => (relationName ? state.subgridTreeGridPrefsByRelation?.[relationName] : undefined),
+      [relationName]
+    )
+  );
+
+  /*==========================================
+  ** REFS
+  ==========================================*/
+  const addRowPendingRef = useRef(false);
+
+  const gridRef = useRef<any>(null);
+
+  // prevents views useEffect from running more than once
+  const viewsLoadedRef = useRef(false);
+
+  const initialApplyDoneRef = useRef<boolean>(false);
+
+  const pendingFiltersRef = useRef<{
+    filterModel: any;
+    advancedFilterModel: any
+  } | null>(null);
+
+  const prevSubgridTypeRef = useRef<string>((useStore.getState().selectedSubgridType?.name) || 'gridView');
+
+  // Track pending advanced filter to apply after showSubgridAdvancedFilter becomes true
+  const pendingAdvancedFilterRef = useRef<AdvancedFilterModel | null>(null);
+
+  const treePrefSaveTimer = useRef<any>(null);
+
+  // Track which relation we've applied prefs for (prevents re-applying on pref changes)
+  // Track whether initial data has been loaded (for canSaveNow guard)
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+
+  // Refs to track current values for canSaveNow (avoids stale closure issues)
+  const initialDataLoadedRef = useRef(initialDataLoaded);
+  const selectedSubgridViewRef = useRef<any>(null);
+  const columnDefsRef = useRef<ColDef[]>([]);
+
+  // Track whether the user has performed an interaction that should trigger saves
+  // This prevents auto-save from firing during initial load (auto-sizing, view apply, etc.)
+  // Saves should ONLY happen after user-initiated actions like editing, column resize by user, etc.
+  const userHasInteractedRef = useRef(false);
+
+  // Note: View loading state is tracked at module level (completedRelationsSet, loadingRelationsSet)
+  // to survive React StrictMode unmount/remount cycles
+
+  /*==========================================
+  ** LOCAL STATE
+  ==========================================*/
+  const [advancedFilterState, setAdvancedFilterState] = useState<AdvancedFilterModel | null>(null);
+
+  // Dynamically resolve ag-grid theme parts to avoid static import issues
+  const [agThemeParts, setAgThemeParts] = useState<{ themeQuartz: any; colorScheme: any } | null>(null);
+
+  const [columnDefs, setColumnDefs] = useState<ColDef[]>([]);
+
+  // Keep columnDefs ref in sync for canSaveNow closure
+  columnDefsRef.current = columnDefs;
+
+  const [colDefsVersion, setColDefsVersion] = useState<number>(0);
+
+  const defaultColDef = useMemo(() => ({
+    editable: false,
+    filter: true,
+    minWidth: 140,
+    cellStyle: { color: theme.palette.text.primary },
+    resizable: true,
+  }), [theme.palette.text.primary]);
+
+  const filtersParams = useMemo(() => ({ suppressSyncLayoutWithGrid: true }), []);
+
+  const [filterState, setFilterState] = useState<FilterModel | null>(null);
+
+  // Only show loading if the tab is active - inactive tabs shouldn't show spinner
+  const [loading, setLoading] = useState<boolean>(isActive);
+
+  const [parentFieldsJson, setParentFieldsJson] = useState<string>('');
+  const parentFieldsJsonRef = useRef<string>('');
+
+  // Handler that updates both state and ref for parent fields changes from Column Manager
+  const handleParentFieldsChange = useCallback((json: string) => {
+    setParentFieldsJson(json);
+    parentFieldsJsonRef.current = json;
+  }, []);
+
+  const relationTreeGridPreferences = relationTreePrefsEntry?.prefs ?? subgridTreeGridPreferences;
+
+  const relationTreeGridPreferenceRecId = relationTreePrefsEntry?.recId || subgridTreeGridPreferenceRecId;
+
+  const [reloadNonce, setReloadNonce] = useState<number>(0);
+
+  // Track if this tab has ever been active - once active, we render the grid and keep it loaded
+  // Using state (not ref) so that when isActive becomes true, we re-render and show the grid
+  const [hasBeenActive, setHasBeenActive] = useState<boolean>(isActive);
+
+  // Ref to track if we've already started data fetch for this relation
+  // This prevents duplicate API calls when dependency arrays trigger multiple runs
+  const dataFetchStartedRef = useRef<boolean>(false);
+
+  // Computed value: should we load data? True if currently active OR has been active before
+  // Using a ref that updates synchronously to avoid race conditions
+  const shouldLoadRef = useRef<boolean>(isActive);
+
+  // Update shouldLoadRef synchronously when isActive changes
+  if (isActive && !shouldLoadRef.current) {
+    shouldLoadRef.current = true;
+  }
+
+  // When tab becomes active for the first time, update state to trigger grid render
+  useEffect(() => {
+    if (isActive && !hasBeenActive) {
+      prettyPrint(`[SubgridCore] Tab activated for: ${relation?.name}`, { isActive, hasBeenActive }, 'green');
+      setHasBeenActive(true);
+    }
+  }, [isActive, hasBeenActive, relation?.name]);
+
+  const [rowData, setRowData] = useState<any[]>([]);
+
+  // selectAllToggle state - keeping setter for future use
+  const [, setSelectAllToggle] = useState<boolean>(false);
+
+  const [selectedRowLocal, setSelectedRowLocal] = useState<any | null>(null);
+
+  // Mass Edit Dialog state
+  const [massEditDialogOpen, setMassEditDialogOpen] = useState(false);
+  const [massEditColumn, setMassEditColumn] = useState<any>(null);
+
+  const setPivotFromManager = useCallback((enable: boolean, pivotColIds: string[]) => {
+
+    const api: any = gridApiRef.current;
+
+    if (!api) return;
+
+    const ca: any = api.getColumnApi?.() || api;
+
+    if (enable) {
+      if (typeof api.setPivotColumns === 'function') {
+        api.setPivotColumns(pivotColIds || []);
+      } else {
+        const state = (ca.getColumnState?.() || []).map((s: any) => {
+          const idx = (pivotColIds || []).indexOf(s.colId);
+          return { ...s, pivot: idx >= 0, pivotIndex: idx >= 0 ? idx : null };
+        });
+
+        ca.applyColumnState?.({ state, applyOrder: false });
+      }
+    } else {
+      if (typeof api.setPivotColumns === 'function') {
+        api.setPivotColumns([]);
+      } else {
+        const state = (ca.getColumnState?.() || []).map((s: any) => ({ ...s, pivot: false, pivotIndex: null }));
+        ca.applyColumnState?.({ state, applyOrder: false });
+      }
+    }
+    ca.setPivotMode?.(!!enable);
+    useStore.getState().setSubgridPivotMode?.(!!enable);
+  }, [gridApiRef]);
+
+  const [showColumnManager, setShowColumnManager] = useState<boolean>(false);
+
+  const sObjectApiName = relation?.name as string;
+
+  // Derive per-relation view state based on sObjectApiName
+  // We ONLY use per-relation state - global state causes race conditions when switching tabs
+  const selectedSubgridView = subgridViewByRelation[sObjectApiName] ?? null;
+
+  // Keep refs in sync with state for canSaveNow closure
+  initialDataLoadedRef.current = initialDataLoaded;
+  selectedSubgridViewRef.current = selectedSubgridView;
+
+  // treeDataActive state - keeping setter for future use
+  const [, setTreeDataActive] = useState<boolean>(false);
+
+  /*==========================================
+  ** DERIVED STATE / MEMOIZED VALUES
+  ==========================================*/
+  const autoGroupColDef = useMemo(() => ({
+    headerName: 'Hierarchy',
+    field: (relationTreeGridPreferences as any)?.groupField,
+    width: 300,
+    cellRendererParams: { suppressCount: true },
+  }), [relationTreeGridPreferences]);
+
+  const parentObjectApiName = useMemo(() => {
+    const obj = selectedObject as any;
+
+    return obj?.qualifiedApiName || obj?.apiName || obj?.sObjectApiName || obj?.sobjectApiName || '';
+  }, [selectedObject]);
+
+  const parentNameField = useMemo(() => {
+    if (!parentObjectApiName) return 'Name';
+
+    return (
+      nameFieldMap.get(parentObjectApiName) ||
+      objectsWithoutNameFieldMap.get(parentObjectApiName) ||
+      'Name'
+    );
+  }, [nameFieldMap, objectsWithoutNameFieldMap, parentObjectApiName]);
+
+  const rowSelection = useMemo(() => createDefaultRowSelection(), []);  // Row selection setup (checkboxes + select-all support)
+
+  // Default autoGroupColumnDef for non-tree grid modes (row grouping)
+  // Tree grid mode sets its own autoGroupColumnDef dynamically with the field property
+  const autoGroupColumnDef = useMemo<ColDef>(() => ({
+    colId: '__auto_group__',
+    headerName: '',
+    width: 280,
+    pinned: 'left',
+    suppressMovable: true,
+    suppressHeaderMenuButton: true,
+    suppressColumnsToolPanel: true,
+    suppressFiltersToolPanel: true,
+    cellRenderer: 'agGroupCellRenderer',
+    cellRendererParams: {
+      suppressCount: true,
+      innerRenderer: (params: any) => {
+        if (params.node?.group || params.node?.level >= 0) {
+          return params.value;
+        }
+        return params.data?.Name ?? '';
+      },
+    },
+  }), []);
+
+
+
+  // Handler for mass edit column menu action
+  const handleMassEditColumn = useCallback((column: any) => {
+    setMassEditColumn(column);
+    setMassEditDialogOpen(true);
+  }, []);
+
+  // NOTE: popupParent is commented out to match the test component
+  const gridOptions: GridOptions = {
+    autoGroupColumnDef: autoGroupColumnDef,
+    cellSelection: true,
+    enableCharts: false,
+    getMainMenuItems: (params) => {
+      const { column, defaultItems } = params;
+
+      // If no column context, just return defaults
+      if (!column) {
+        return defaultItems;
+      }
+
+      const colDef = column.getColDef();
+      const colId = column.getColId();
+
+      // Exclude system columns: row selection, error column, group columns
+      const isSystemColumn =
+        colId === 'ag-Grid-SelectionColumn' ||
+        colId === 'error' ||
+        colId === '__auto_group__' ||
+        colId?.startsWith('ag-Grid-AutoColumn');
+
+      // Exclude non-editable columns
+      const isNonEditable = colDef.editable === false;
+
+      // Don't show Mass Edit in pivot mode
+      const isInPivotMode = subgridPivotMode;
+
+      // Don't show for group columns or when row grouping is active
+      const isGroupColumn = colDef.rowGroup === true || colDef.pivot === true;
+
+      if (isSystemColumn || isNonEditable || isInPivotMode || isGroupColumn) {
+        return defaultItems;
+      }
+
+      return [
+        ...defaultItems,
+        'separator',
+        {
+          name: 'Mass Edit…',
+          icon: '<span class="ag-icon ag-icon-edit"></span>',
+          action: () => handleMassEditColumn(column)
+        }
+      ];
+    },
+    overlayComponentParams: {
+      loading: { overlayText: 'Loading data...' },
+      noRows: { overlayText: 'The query did not return any records!' },
+      noMatchingRows: { overlayText: 'Current Filter Matches No Rows' },
+      exporting: { overlayText: 'Exporting your data...' },
+    },
+  };
+
+  /*==========================================
+  ** CALLBACKS
+  ==========================================*/
+
+
+
+  const buildBasicColumns = useCallback((meta: SObjectMetadata, recordsSample: any[]): ColDef[] => {
+    try {
+      // Prefer name field mapping if present
+      const mappedName = nameFieldMap.get(meta.apiName) || meta.fields.find(f => (f as any).isNameField)?.name || 'Name';
+      const candidateFields: string[] = [];
+
+      // Add mapped name first if exists in sample
+      if (recordsSample?.length && mappedName && Object.prototype.hasOwnProperty.call(recordsSample[0], mappedName)) {
+        candidateFields.push(mappedName);
+      }
+
+      // Heuristic: pick up to 5 more simple fields from metadata order that exist in sample
+      const simpleTypes = new Set(['STRING', 'PICKLIST', 'EMAIL', 'PHONE', 'URL', 'DOUBLE', 'INTEGER', 'LONG', 'DECIMAL', 'BOOLEAN', 'CURRENCY', 'DATE', 'DATETIME']);
+
+      for (const f of meta.fields) {
+        if (candidateFields.length >= 6) break;
+        if (!simpleTypes.has(f.type)) continue;
+        if (f.name === mappedName || f.name === 'Id') continue;
+        if (recordsSample?.length && Object.prototype.hasOwnProperty.call(recordsSample[0], f.name)) {
+          candidateFields.push(f.name);
+        }
+      }
+
+      // Always include Id last
+      if (!candidateFields.includes('Id')) {
+        candidateFields.push('Id');
+      }
+
+      const cols: ColDef[] = candidateFields.map((field) => ({
+        field,
+        headerName: meta.fields.find(f => f.name === field)?.label || field,
+      }));
+
+      return cols;
+    } catch {
+      // Fallback minimal cols
+      return [
+        { field: 'Name', headerName: 'Name' },
+        { field: 'Id', headerName: 'Id' },
+      ];
+    }
+  }, [nameFieldMap]);
+
+  // ✅ Grid state persistence - using shared hook like AppGrid
+  // This replaces the manual saveAgGridState function with proper debouncing and suspension
+  // NOTE: We use refs (initialDataLoadedRef, selectedSubgridViewRef, columnDefsRef) instead of
+  // direct state values to avoid stale closure issues where canSaveNow/buildUpsertPayload
+  // capture old values and never update.
+  const {
+    saveAgGridState,
+    handleGridStateChange,
+    suspend: suspendSaves,
+    resume: resumeSaves,
+  } = useGridStatePersistence({
+    getGridApi: () => gridApiRef.current,
+    canSaveNow: () => {
+      // Use refs to get current values, avoiding stale closure issues
+      // CRITICAL: userHasInteractedRef must be true - saves should ONLY happen
+      // after user-initiated actions (editing, manual column resize, etc.)
+      // NOT during initial load, auto-sizing, or view application
+      const canSave = !!(
+        userHasInteractedRef.current &&
+        initialDataLoadedRef.current &&
+        sObjectApiName &&
+        selectedSubgridViewRef.current &&
+        columnDefsRef.current.length > 0
+      );
+
+      return canSave;
+    },
+    setCurrentState: () => { /* Not needed for subgrid */ },
+    getExtras: () => {
+      const store = useStore.getState();
+      return {
+        columnStyles: store.objSubgridColumnStyles || [],
+        rowStyles: store.objSubgridRowStyles || [],
+        calculatedColumns: store.objCalculatedSubgridColumns || [],
+        filterOptions: subgridFilterOptions || [],
+      };
+    },
+    buildUpsertPayload: (gridState, colState, extras) => {
+      // Use ref to get current view, avoiding stale closure issues
+      const view = selectedSubgridViewRef.current as any;
+      const viewName = view?.name || view?.Name || 'Default View';
+      const viewId = view?.id || view?.Id;
+
+      const payload: any = {
+        Name: viewName,
+        AppGridAg__SObjectApiName__c: sObjectApiName,
+        AppGridAg__Grid_State__c: JSON.stringify(gridState || {}),
+        AppGridAg__Column_State__c: JSON.stringify(colState || []),
+        AppGridAg__IsSubgridView__c: true,
+        AppGridAg__ShowAdvancedFilter__c: !!showSubgridAdvancedFilter,
+        AppGridAg__Calculated_Columns__c: JSON.stringify(extras.calculatedColumns || []),
+        AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles || []),
+        AppGridAg__Row_Styles__c: JSON.stringify(extras.rowStyles || []),
+        AppGridAg__FilterOptions__c: JSON.stringify(extras.filterOptions || []),
+        AppGridAg__Pivot_Mode__c: !!subgridPivotMode,
+        AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
+      };
+
+      if (viewId) {
+        payload.Id = viewId;
+      }
+
+      return payload;
+    },
+    doUpsert: async (payload) => {
+      const res = await apiClient.upsertRecs({
+        sObjectName: 'AppGridAg__AG_View__c',
+        jsonRecs: JSON.stringify([payload]),
+      });
+
+      if (res.status !== 'success' || res.results.length !== 1) {
+        const errorMessage = res.errorMessage || res.errors?.[0] || 'Upsert failed';
+        return { success: false, id: '', errorMessage };
+      }
+
+      const r = res.results[0];
+
+      if (!r.isSuccess) {
+        const errorMessage = r.errorMessages?.[0] || r.errors?.[0] || 'Upsert failed';
+        return { success: false, id: '', errorMessage };
+      }
+
+      return { success: true, id: r.recordId || '', errorMessage: undefined };
+    },
+    onAfterSuccess: async (id) => {
+      // Update the per-relation view with the new ID if it was a new record
+      // Use ref to get current view, avoiding stale closure issues
+      const currentView = selectedSubgridViewRef.current;
+      if (id && currentView && currentView.id !== id) {
+        const updatedView = { ...currentView, id, Id: id };
+        setSubgridViewForRelation(sObjectApiName, updatedView);
+        // Only reload views when a NEW view was created (id changed)
+        // This prevents duplicate queries on every state save
+        await reloadViews();
+      }
+      // Note: We intentionally do NOT reload views on every state save
+      // Reloading is only needed when a new view is created (above) or
+      // when explicitly triggered by user actions like creating/deleting views
+    },
+    enqueueSnackbar,
+    action,
+  });
+
+  const onColumnMoved = useCallback(
+    (event: ColumnMovedEvent) => {
+      if (!event.finished) {
+        return;
+      }
+      // Column moving is user-initiated, enable saves
+      userHasInteractedRef.current = true;
+      handleGridStateChange();
+    },
+    [handleGridStateChange]
+  );
+
+  const onFirstDataRendered = useCallback((params: FirstDataRenderedEvent) => {
+    // Use requestAnimationFrame + setTimeout to ensure DOM is fully painted
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if ((params.api as any).isDestroyed?.()) return;
+        const allColumnIds = params.api.getColumns()?.map(col => col.getColId()) || [];
+
+        if (allColumnIds.length > 0) {
+          params.api.autoSizeColumns(allColumnIds, false);
+        }
+      }, 50);
+    });
+  }, []);
+
+  // Fetch subgrid TreeGrid preferences for this relation (only on first switch into Tree Grid view per object)
+  const fetchTreeGridPrefs = useCallback(async (force = false) => {
+    try {
+      const t = (selectedSubgridType?.name || '').toLowerCase().replace(/\s+/g, '');
+
+      const relType = ((relation as any)?.selectedGridType || 'gridView').toLowerCase().replace(/\s+/g, '');
+
+      const prev = (prevSubgridTypeRef.current || '').toLowerCase().replace(/\s+/g, '');
+
+      const key = String(sObjectApiName || '');
+
+      if (!sObjectApiName) {
+        return;
+      }
+
+      if (!force && fetchedTreePrefsFor.has(key)) {
+        return;
+      }
+
+      if (!force) {
+        if (t !== 'treegrid' || relType !== 'treegrid') {
+          return;
+        }
+        if (prev === 'treegrid') {
+          return;
+        }
+      }
+
+      const res = await apiClient.getObjTreeGridPreferences({ sObjectName: sObjectApiName });
+
+      const arr = Array.isArray(res) ? res : (res?.treeGridPreferences || []);
+
+      if (!force) {
+        fetchedTreePrefsFor.add(key);
+      }
+
+      if (Array.isArray(arr) && arr.length) {
+        const prefRec = arr.find((p: any) => p?.isSubgridView === true) || arr[0];
+        const recId = prefRec?.Id || prefRec?.id || '';
+        setSubgridTreeGridPreferences(prefRec as any, relationName);
+        if (recId) setSubgridTreeGridPreferenceRecId(recId, relationName);
+      } else {
+        setSubgridTreeGridPreferences(null as any, relationName);
+        setSubgridTreeGridPreferenceRecId('', relationName);
+        const latestStore = useStore.getState();
+        const liveSubgridType = latestStore.selectedSubgridType?.name || selectedSubgridType?.name;
+        const liveRelationType = ((relation as any)?.selectedGridType || relType || 'gridView').toLowerCase().replace(/\s+/g, '');
+        if (liveRelationType === 'treegrid' && liveSubgridType === 'treeGrid') {
+          enqueueSnackbar(`No Tree Grid preferences found for ${sObjectApiName}`, {
+            action: (snackbarId) => (
+              <>
+                <Button size="small" color="inherit" onClick={() => { setExclusivePanel('showTreegridConfigPanel'); closeSnackbar(snackbarId); }}>Configure</Button>
+                <Button size="small" color="inherit" onClick={() => { closeSnackbar(snackbarId); }}>Dismiss</Button>
+              </>
+            ),
+            variant: 'info',
+            autoHideDuration: null,
+          });
+        }
+      }
+    } catch (error: any) {
+      prettyPrint('[Subgrid] Error fetching treeGrid preferences', { message: error.message, stack: error.stack, sObjectApiName }, 'red');
+      enqueueSnackbar('Unexpected error fetching subgrid treeGrid preferences', { variant: 'error', action, autoHideDuration: null });
+    }
+  }, [action, apiClient, closeSnackbar, enqueueSnackbar, relation, relationName, sObjectApiName, selectedSubgridType?.name, setExclusivePanel, setSubgridTreeGridPreferenceRecId, setSubgridTreeGridPreferences]);
+
+  const getLookupField = useCallback((meta: SObjectMetadata | null): string => {
+    if (!meta || !selectedObject) {
+      return '';
+    }
+
+    const parentQualified = (selectedObject as any).qualifiedApiName || (selectedObject as any).QualifiedApiName;
+
+    const f = meta.fields.find((fld: SObjectFieldMetadata) => fld.type === 'REFERENCE' && Array.isArray(fld.referenceTo) && fld.referenceTo.includes(parentQualified));
+
+    return f?.name || '';
+  }, [selectedObject]);
+
+  const getRowId = useCallback((p: any) => String(p?.data?.Id || ''), []);
+
+  // Close handler for GridEditDialog
+  const handleCloseGridEditDialog = useCallback(() => {
+    setGridEditDialogState({ show: false, gridId: null, isSubgrid: false, selectedView: selectedSubgridView! });
+  }, [selectedSubgridView, setGridEditDialogState]);
+
+  const queueSaveTreeGridPrefs = useCallback(() => {
+    const api: any = gridApiRef.current;
+    const t = (selectedSubgridType?.name || '').toLowerCase().replace(/\s+/g, '');
+    const relType = ((relation as any)?.selectedGridType || 'gridView').toLowerCase().replace(/\s+/g, '');
+    if (t !== 'treegrid' || relType !== 'treegrid' || !api) return;
+    const prefs: any = relationTreeGridPreferences as any;
+    const parentField: string | undefined = prefs?.parentLookupField;
+    const groupField: string | undefined = prefs?.groupField;
+    if (!parentField || !groupField) return;
+
+    if (treePrefSaveTimer.current) clearTimeout(treePrefSaveTimer.current);
+    treePrefSaveTimer.current = setTimeout(async () => {
+      try {
+        const colState = api?.getColumnState?.() || [];
+        const currentFilterModel = api?.getFilterModel?.() || {};
+        const currentAdvancedFilterModel = api?.getAdvancedFilterModel?.() || undefined;
+
+        const keyParts = [
+          sObjectApiName || '',
+          parentField,
+          groupField,
+          JSON.stringify(colState || []),
+          JSON.stringify(currentFilterModel || {}),
+          JSON.stringify(currentAdvancedFilterModel || null),
+        ];
+        const nextKey = keyParts.join('|');
+        const scope = `${sObjectApiName || ''}:${(selectedParentRow as any)?.Id || ''}`;
+        const prevKey = lastTreePrefsKey.get(scope) || '';
+        if (prevKey === nextKey) return;
+
+        const payload = {
+          columnState: colState,
+          filterModel: currentFilterModel,
+          advancedFilterModel: currentAdvancedFilterModel,
+        };
+        const rec: any = {
+          AppGridAg__SObjectApiName__c: sObjectApiName || '',
+          AppGridAg__Parent_Lookup_Field__c: parentField,
+          AppGridAg__Group_Field__c: groupField,
+          AppGridAg__Preferences__c: JSON.stringify(payload),
+          AppGridAg__IsSubgridView__c: true,
+        };
+        const existingId = relationTreeGridPreferenceRecId || (relationTreeGridPreferences as any)?.Id || '';
+        if (existingId) rec.Id = existingId;
+
+        const res = await apiClient.upsertRecs(
+          {
+            sObjectName: 'AppGridAg__AG_TreeGrid_Prefs__c',
+            jsonRecs: JSON.stringify([rec]),
+          });
+
+        if (res.status === 'success' && res.results[0]?.isSuccess && res.results[0]?.recordId) {
+          lastTreePrefsKey.set(scope, nextKey);
+          const newId = res.results[0].recordId as string;
+
+          const prevId = (useStore.getState().subgridTreeGridPreferenceRecId || '') as string;
+
+          if (newId && newId !== prevId) useStore.getState().setSubgridTreeGridPreferenceRecId(newId, relationName);
+        }
+      } catch (e: any) {
+        prettyPrint('[Subgrid] Error saving treegrid preferences', { message: e?.message, stack: e?.stack }, 'red');
+        enqueueSnackbar('Unexpected error saving treegrid preferences', { variant: 'error', action, autoHideDuration: null });
+      }
+    }, 400);
+  }, [action, apiClient, enqueueSnackbar, gridApiRef, relation, relationName, relationTreeGridPreferenceRecId, relationTreeGridPreferences, sObjectApiName, selectedParentRow, selectedSubgridType?.name]);
+
+  const seedTaskWhatDefaults = useCallback((record: any | null | undefined) => {
+    if (!record) return;
+
+    const childName = String(relation?.name || '').toLowerCase();
+
+    if (childName !== 'task' && childName !== 'event') {
+      return;
+    }
+    const parentId = selectedParentRow?.Id;
+
+    if (!parentId) {
+      return;
+    }
+
+    if (record.WhatId) {
+      return;
+    }
+    record.WhatId = parentId;
+
+    const displayName =
+      (parentNameField && selectedParentRow?.[parentNameField]) ??
+      selectedParentRow?.Name ??
+      parentId;
+
+    record.What = { Id: parentId, Name: displayName };
+  }, [relation?.name, selectedParentRow, parentNameField]);
+
+  const syncSubgridFilterState = useCallback(() => {
+    const api = gridApiRef.current as GridApi | null | undefined;
+    if (!api || api.isDestroyed?.()) {
+      return;
+    }
+    const currentFilterModel = (api.getFilterModel?.() as FilterModel) || null;
+    const nextFilterModel =
+      currentFilterModel && Object.keys(currentFilterModel).length > 0
+        ? currentFilterModel
+        : null;
+    const currentAdvancedFilterModel = (api.getAdvancedFilterModel?.() as AdvancedFilterModel) || null;
+    setFilterState(nextFilterModel);
+    setAdvancedFilterState(currentAdvancedFilterModel);
+  }, [gridApiRef, setAdvancedFilterState, setFilterState]);
+
+  const handleSubgridFilterChanged = useCallback(() => {
+    // Filter changes from the UI are user-initiated, enable saves
+    userHasInteractedRef.current = true;
+    syncSubgridFilterState();
+    handleGridStateChange();
+    queueSaveTreeGridPrefs();
+  }, [handleGridStateChange, queueSaveTreeGridPrefs, syncSubgridFilterState]);
+
+  const { addGridRow: buildNewRecord } = useAddGridRow({
+    guardCreate: (): GuardResult => ({ allowed: true }),
+    metadata: objMetadataMap.current?.get(relation?.name as string) as any,
+    selectedRecordType: useStore.getState().selectedRecordType,
+    setSelectedRecordType: (id: string) => {
+      useStore.getState().setSelectedRecordType(id);
+    },
+    setRecordTypes: (rts: any[]) => {
+      useStore.getState().setRecordTypes(rts as any);
+    },
+    setShowRecordTypeDialog: (open: boolean) => {
+      useStore.getState().setShowRecordTypeDialog(open);
+    },
+    userInfo: useStore.getState().userInfo as any,
+    booleanNullAsFalse: true,
+  });
+
+  const [changedRows, addChangedRowId] = useChangedRows();
+
+  const { dateFormatter, numberFormatter, currencyFormatter, percentageFormatter } = useFormatter();
+
+  const gridId = useGridId();
+
+  const { sideBar, statusBar } = useGridContainer({
+    isSubgrid: true,
+    setPivotMode: (checked: boolean) => setPivotMode(checked),
+    handleGridStateChange,
+    includeFilters: false,
+    filtersParams,
+    position: 'right',
+    // Register native Columns tool panel so we can host it inside the dialog
+    columnManagerToolPanel: 'agColumnsToolPanel',
+    columnsPanelWidth: 300,
+    includeStatusBar: true,
+    statusBarVariant: 'subgrid',
+    columnManagerParams: {
+      getColumnDefs: () => columnDefs,
+      columnsVersion: () => colDefsVersion,
+    },
+  });
+
+  // Grid events for consistent state change handling (mirrors main grid pattern)
+  const gridEvents = useGridEvents({
+    handleGridStateChange,
+    setPivotMode,
+    onFilterChangedExtras: (event) => {
+      const api = gridApiRef.current;
+      if (!api) return;
+      const currentAdvancedFilterModel = api.getAdvancedFilterModel?.();
+      if ((event as any).source === 'advancedFilter') {
+        setAdvancedFilterState(currentAdvancedFilterModel ?? null);
+      }
+      if ((event as any).source === 'columnFilter') {
+        const model = api.getFilterModel?.();
+        setFilterState(model ?? null);
+      }
+    },
+    onGridStateChangeExtras: queueSaveTreeGridPrefs,
+  });
+
+  // Helper to detect user-initiated events and mark interaction
+  // This enables saves - saves should ONLY happen after user-initiated actions
+  const markUserInteraction = useCallback((source: string | undefined) => {
+    // User-initiated sources from AG Grid events
+    const userSources = [
+      'uiColumnResized',    // User dragged column border
+      'uiColumnDragged',    // User dragged column
+      'uiColumnSorted',     // User clicked sort
+      'uiColumnMoved',      // User reordered column
+      'columnFilter',       // User applied column filter
+      'advancedFilter',     // User applied advanced filter
+      'toolPanelUi',        // User changed via tool panel
+    ];
+    if (source && userSources.includes(source)) {
+      if (!userHasInteractedRef.current) {
+        prettyPrint('[SubgridCore] User interaction detected, enabling saves', source, 'cyan');
+      }
+      userHasInteractedRef.current = true;
+    }
+  }, []);
+
+  // Wrapper handlers that detect user interaction before delegating to gridEvents
+  const handleColumnResized = useCallback((event: any) => {
+    markUserInteraction(event?.source);
+    gridEvents.onColumnResized();
+  }, [gridEvents, markUserInteraction]);
+
+  const handleColumnPinned = useCallback((event: any) => {
+    // Column pinning is always user-initiated
+    userHasInteractedRef.current = true;
+    gridEvents.onColumnPinned();
+  }, [gridEvents]);
+
+  const handleColumnVisible = useCallback((event: any) => {
+    markUserInteraction(event?.source);
+    gridEvents.onColumnVisible();
+  }, [gridEvents, markUserInteraction]);
+
+  const handleSortChanged = useCallback((event: any) => {
+    markUserInteraction(event?.source);
+    gridEvents.onSortChanged();
+  }, [gridEvents, markUserInteraction]);
+
+  const handleColumnRowGroupChanged = useCallback((event: any) => {
+    // Row grouping changes are always user-initiated
+    userHasInteractedRef.current = true;
+    gridEvents.onColumnRowGroupChanged();
+  }, [gridEvents]);
+
+  const handleColumnPivotModeChanged = useCallback((event: any) => {
+    // Pivot mode changes are always user-initiated
+    userHasInteractedRef.current = true;
+    gridEvents.onColumnPivotModeChanged(event);
+  }, [gridEvents]);
+
+  const handleColumnPivotChanged = useCallback(() => {
+    // Pivot changes are always user-initiated
+    userHasInteractedRef.current = true;
+    gridEvents.onColumnPivotChanged();
+  }, [gridEvents]);
+
+  const handleColumnValueChanged = useCallback(() => {
+    // Value changes are always user-initiated
+    userHasInteractedRef.current = true;
+    gridEvents.onColumnValueChanged();
+  }, [gridEvents]);
+
+  // Filter templates: save/delete handlers for subgrid
+  const { onFilterNameCreated, deleteFilter } = useFilterTemplates({
+    getGridApi: () => gridApiRef.current as any,
+    filterOptions: subgridFilterOptions,
+    setFilterOptions: setSubgridFilterOptions,
+    selectedFilter: selectedSubgridFilter as any,
+    setSelectedFilter: setSelectedSubgridFilter as any,
+    setShowAdvancedFilter: setShowSubgridAdvancedFilter,
+    setAdvancedFilterState,
+    onAfterChange: () => {
+      setTimeout(() => handleGridStateChange(), 0);
+    },
+  });
+
+  // View upserts: create/save template for subgrid
+  const { createDefaultView, saveViewByName: onTemplateNameCreated, reloadViews } = useViewUpserts({
+    getGridApi: () => gridApiRef.current as any,
+    sObjectApiName: relation?.name as string,
+    isSubgrid: true,
+    upsert: async (payload: any) => {
+      const upsertRecs = [payload];
+
+      const newViewName = payload.Name;
+
+      const res = await apiClient.upsertRecs(
+        {
+          sObjectName: 'AppGridAg__AG_View__c',
+          jsonRecs: JSON.stringify(upsertRecs),
+        });
+
+      if (res.status !== 'success' || res.results.length !== 1) {
+        throw new Error(res.errorMessage || 'Unexpected error saving subgrid state');
+      }
+
+      const r = res.results[0];
+
+      if (!r.isSuccess) {
+        throw new Error(r.errorMessages?.[0] || r.errors?.[0] || 'Failed to save view');
+      }
+
+      // refresh views
+      const views = await reloadViews();
+
+      // find the new view
+      const newView = views.find((v: any) => v.name === newViewName);
+
+      if (newView) {
+        setSubgridViewForRelation(sObjectApiName, newView);
+      }
+
+      return { success: r.isSuccess, id: r.recordId || '' };
+    },
+    fetchViews: async () => {
+      try {
+        const reloadedViews = await apiClient.getObjViews({ sObjectName: relation?.name as string, isSubgridView: true });
+
+        setSubgridViewOptionsForRelation(sObjectApiName, reloadedViews);
+
+        return reloadedViews;
+      } catch {
+        return [];
+      }
+    },
+    setViewOptions: (views: any[]) => setSubgridViewOptions(views as any),
+    setSelectedView: (v: any) => setSelectedSubgridView(v as any),
+    getParentFields: () => parentFieldsJson,
+    // Provide metadata for building proper default column state when grid is empty
+    getMetadata: () => objMetadataMap.current?.get(sObjectApiName) || null
+  });
+
+  /*==========================================
+  ** EFFECTS
+  ==========================================*/
+
+  useEffect(() => {
+    fetchTreeGridPrefs();
+  }, [fetchTreeGridPrefs]);
+
+  useEffect(() => {
+    const token = PubSub.subscribe('RequestSubgridTreePrefs', (_msg, payload) => {
+      if (!payload) return;
+      if (payload.relationName !== relationName) return;
+      fetchTreeGridPrefs(true);
+    });
+    return () => {
+      PubSub.unsubscribe(token);
+    }
+  }, [fetchTreeGridPrefs, relationName]);
+
+  useEffect(() => {
+    const hasColumnFilters = !!(filterState && Object.keys(filterState).length > 0);
+    const hasAdvancedFilters = !!advancedFilterState;
+    setIsSubgridFilterActive(hasColumnFilters || hasAdvancedFilters);
+  }, [advancedFilterState, filterState, setIsSubgridFilterActive]);
+
+  // Refresh cells when column styles change so cellStyle functions re-evaluate
+  useEffect(() => {
+    const api = gridApiRef.current || gridApi;
+    if (api && objSubgridColumnStyles) {
+      api.refreshCells({ force: true });
+    }
+  }, [objSubgridColumnStyles, gridApi, gridApiRef]);
+
+  // Apply selected filter template when changed (mirrors main grid pattern)
+  useEffect(() => {
+    const api = gridApiRef.current;
+    if (!api || !selectedSubgridFilter) return;
+
+    if (selectedSubgridFilter.type === SelectedFilterType.AdvancedFilterModel) {
+      const model = selectedSubgridFilter.filterModel as AdvancedFilterModel;
+
+      // AG Grid requires enableAdvancedFilter=true before setAdvancedFilterModel works.
+      // If not already enabled, store the model and enable the filter first.
+      if (!showSubgridAdvancedFilter) {
+        pendingAdvancedFilterRef.current = model;
+        setShowSubgridAdvancedFilter(true);
+      } else {
+        api.setAdvancedFilterModel?.(model);
+        setAdvancedFilterState(model);
+        handleGridStateChange();
+      }
+    } else if (selectedSubgridFilter.type === SelectedFilterType.FilterModel) {
+      const model = selectedSubgridFilter.filterModel as FilterModel;
+      pendingAdvancedFilterRef.current = null;
+      api.setFilterModel(model);
+      setFilterState(model);
+      setShowSubgridAdvancedFilter(false);
+      handleGridStateChange();
+    }
+  }, [gridApiRef, selectedSubgridFilter, setShowSubgridAdvancedFilter, handleGridStateChange, showSubgridAdvancedFilter]);
+
+  // Apply pending advanced filter after showSubgridAdvancedFilter becomes true
+  useEffect(() => {
+    const api = gridApiRef.current;
+    if (!api || !showSubgridAdvancedFilter || !pendingAdvancedFilterRef.current) return;
+
+    const model = pendingAdvancedFilterRef.current;
+
+    // Use setTimeout to ensure AG Grid has processed the enableAdvancedFilter change
+    setTimeout(() => {
+      api.setAdvancedFilterModel?.(model);
+      setAdvancedFilterState(model);
+      pendingAdvancedFilterRef.current = null;
+      handleGridStateChange();
+    }, 0);
+  }, [gridApiRef, showSubgridAdvancedFilter, handleGridStateChange]);
+
+  // Track previous subgrid type to detect user-initiated transitions
+  useEffect(() => {
+    prevSubgridTypeRef.current = selectedSubgridType?.name || 'gridView';
+  }, [selectedSubgridType?.name]);
+
+  // Close any open panels when switching subgrid view type
+  useEffect(() => {
+    // Close property side-panels
+    useStore.getState().setShowTreegridConfigPanel(false);
+    useStore.getState().setShowFlowConfigPanel(false);
+    useStore.getState().setShowColumnStylePanel(false);
+    useStore.getState().setShowSubgridColumnStylePanel(false);
+    useStore.getState().setShowCalculatedColumnPanel(false);
+    useStore.getState().setShowSubgridCalculatedColumnPanel(false);
+    // Close Column Manager dialog and any open tool panel
+    setShowColumnManager(false);
+    (gridApiRef.current as any)?.closeToolPanel?.();
+
+  }, [selectedSubgridType?.name, gridApiRef]);
+
+  // Use the unified grid prefs hook - handles load/save of AG_Grid_Prefs__c
+  // Only load when tab has been active to prevent unnecessary API calls for hidden tabs
+  const {
+    lastViewUsed: gridPrefLastViewUsed,
+    isLoaded: gridPrefsLoaded,
+    saveLastViewUsed,
+  } = useGridPrefs({
+    apiClient,
+    sObjectApiName,
+    isSubgrid: true,
+    enabled: hasBeenActive,
+  });
+
+  // Callback for when user changes the selected view
+  const handleSubgridViewChange = useCallback((view: any) => {
+    // restores column and filter state from saved view
+    const loadView = (view: SObjectView) => {
+      try {
+        // Suspend saves during view application to prevent AG Grid events from triggering saves
+        suspendSaves('view-change');
+
+        const viewId = view?.id;
+
+        // updates the saved grid preference
+        if (viewId) {
+          saveLastViewUsed(viewId);
+        }
+
+        const api = gridApiRef.current as any;
+
+        if (!api || api.isDestroyed?.()) {
+          resumeSaves('view-change');
+          return;
+        }
+
+        const columnState = JSON.parse(view.columnState)
+
+        const gridState = JSON.parse(view.gridState!)
+
+        api.applyColumnState({ state: columnState as any, applyOrder: true });
+
+        // Auto-size columns after applying view state
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (api.isDestroyed?.()) return;
+            const allColumnIds = api.getColumns()?.map((col: any) => col.getColId()) || [];
+            if (allColumnIds.length > 0) {
+              api.autoSizeColumns(allColumnIds, false);
+            }
+          }, 50);
+        });
+
+        // Always clear/set filters so switching to a view without saved
+        // filters doesn't leave stale filters from the previous view
+        const filterModel = gridState?.filter?.filterModel ?? null;
+        const advancedFilterModel = gridState?.filter?.advancedFilterModel ?? null;
+
+        api.setFilterModel(filterModel);
+        api.setAdvancedFilterModel?.(advancedFilterModel);
+
+        // Clear the selected filter dropdown so a stale filter template
+        // from the previous view doesn't re-apply via the selectedFilter effect
+        setSelectedSubgridFilter(null);
+
+        // Initialize parentFieldsJson from selectedSubgridView
+        if (view.parentFields) {
+          setParentFieldsJson(view.parentFields);
+          parentFieldsJsonRef.current = view.parentFields;
+        } else {
+          setParentFieldsJson('');
+          parentFieldsJsonRef.current = '';
+        }
+
+        // Resume saves after a delay to let AG Grid events AND column rebuild settle
+        // This must be longer than the column rebuild effect's resume delay (200ms)
+        // to ensure the view-change suspension outlasts any triggered column rebuilds
+        setTimeout(() => {
+          resumeSaves('view-change');
+        }, 500);
+      } catch (error: any) {
+        // Resume saves even on error
+        resumeSaves('view-change');
+        enqueueSnackbar(`Unexpected error restoring selected view - ${error.message}}`, { action, variant: 'error', autoHideDuration: null });
+      }
+    }
+
+    loadView(view);
+  }, [action, enqueueSnackbar, gridApiRef, resumeSaves, saveLastViewUsed, suspendSaves]);
+
+  // ✅ Unified view loading effect - waits for gridApi to be ready before fetching views.  If no views exist, creates a default view immediately (since gridApi is available)
+  useEffect(() => {
+    // Only proceed if this tab has been activated (use ref for synchronous check)
+    if (!shouldLoadRef.current) {
+      return;
+    }
+
+    if (!gridApi || !gridPrefsLoaded) {
+      return;
+    }
+
+    // Prevent duplicate in-flight loads (but allow retry later)
+    if (loadingRelationsSet.has(sObjectApiName)) {
+      return;
+    }
+
+    // If views already loaded for this mount, do nothing
+    if (viewsLoadedRef.current) {
+      return;
+    }
+
+    // Suspend saves during initial load to prevent AG Grid init events from triggering saves
+    suspendSaves('initial-load');
+
+    loadingRelationsSet.add(sObjectApiName);
+
+    const run = async () => {
+      try {
+        const views = await apiClient.getObjViews({
+          sObjectName: sObjectApiName,
+          isSubgridView: true,
+        });
+
+        if (views.length === 0) {
+          await createDefaultView();
+
+          const reloadedViews = await reloadViews();
+
+          if (!reloadedViews.length) {
+            throw new Error('reloadViews returned empty after default creation');
+          }
+
+          // setSubgridViewOptionsForRelation(sObjectApiName, reloadedViews);
+
+          setSubgridViewForRelation(sObjectApiName, reloadedViews[0]);
+        } else {
+          let viewToUse = views[0];
+
+          if (gridPrefLastViewUsed) {
+            const found = views.find(
+              (v: any) => (v.Id || v.id) === gridPrefLastViewUsed
+            );
+            if (found) viewToUse = found;
+          }
+
+          setSubgridViewOptionsForRelation(sObjectApiName, views);
+          setSubgridViewForRelation(sObjectApiName, viewToUse);
+        }
+
+        viewsLoadedRef.current = true;
+        setInitialDataLoaded(true);
+      } catch (error: any) {
+        enqueueSnackbar(`Unexpected error loading views - ${error.message}`, {
+          action,
+          variant: 'error',
+          autoHideDuration: null,
+        })
+
+        // Allow retry on next render
+        viewsLoadedRef.current = false;
+      } finally {
+        loadingRelationsSet.delete(sObjectApiName);
+      }
+    };
+
+    run();
+    // Note: isActive is included to trigger the effect when the tab becomes active.
+    // We use shouldLoadRef and viewsLoadedRef to prevent duplicate runs.
+    // hasBeenActive is NOT included because shouldLoadRef handles that case.
+  }, [
+    action,
+    apiClient,
+    createDefaultView,
+    enqueueSnackbar,
+    gridApi,
+    gridPrefLastViewUsed,
+    gridPrefsLoaded,
+    isActive,
+    reloadViews,
+    sObjectApiName,
+    setSubgridViewForRelation,
+    setSubgridViewOptionsForRelation,
+    suspendSaves,
+  ]);
+
+  // Effect 1: Fetch subgrid data (query execution)
+  // This effect ONLY handles data fetching - column building is separate
+  useEffect(() => {
+    // Only proceed if this tab has been activated (use ref for synchronous check)
+    if (!shouldLoadRef.current) {
+      return;
+    }
+
+    // Prevent duplicate data fetches - only fetch once per relation
+    if (dataFetchStartedRef.current) {
+      return;
+    }
+    dataFetchStartedRef.current = true;
+
+    let mounted = true;
+
+    const run = async () => {
+      try {
+        // 1) Ensure child metadata loaded
+        let metadata = objMetadataMap.current?.get(sObjectApiName) || null;
+
+        if (!metadata) {
+          metadata = await apiClient.getMetadata({ sObjectName: sObjectApiName });
+          if (metadata) {
+            objMetadataMap.current?.set(sObjectApiName, metadata);
+          }
+        }
+
+        if (!metadata) {
+          throw new Error(`Metadata not found for ${sObjectApiName}`);
+        }
+
+        useStore.getState().setSelectedSubgridObjMetadata(metadata as any);
+
+        // 2) Determine lookup field to parent
+        const lookupField = getLookupField(metadata);
+        if (!lookupField) {
+          throw new Error('Lookup field to parent not found');
+        }
+
+        // 3) Query related records
+        const ruleObj = {
+          condition: 'and',
+          rules: [
+            { label: lookupField, field: lookupField, operator: 'equal', type: 'string', value: selectedParentRow?.Id }
+          ],
+          not: false,
+        } as any;
+
+        const paramsObj = {
+          sObjectName: sObjectApiName,
+          queryRule: JSON.stringify(ruleObj),
+          subQueryRule: null,
+          subQueryRelation: null,
+        };
+
+        setLoading(true);
+
+        prettyPrint('[SubGrid] - query params are',
+          paramsObj, 'blue'
+        )
+
+        const apiResult = await apiClient.executeDynamicSOQL(paramsObj);
+
+        let recs: any[] = (apiResult?.status === 'success' && Array.isArray(apiResult?.records)) ? apiResult.records : [];
+
+        if (!mounted) {
+          return;
+        }
+
+        const fieldTypeMap = buildFieldTypeMap((metadata as any)?.fields || []);
+
+        recs = decodeAndConvertRecords(recs, fieldTypeMap);
+
+        setRowData(recs);
+      } catch (error: any) {
+        prettyPrint('[Subgrid] Error loading subgrid data', { message: error.message, stack: error.stack, sObjectApiName }, 'red');
+        enqueueSnackbar(`Unexpected error loading subgrid data - ${error.message}`, { variant: 'error', action, autoHideDuration: null })
+
+        // Minimal failure — leave placeholder data
+        setRowData([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    run();
+
+    return () => {
+      mounted = false;
+    };
+    // Note: isActive is included to trigger the effect when the tab becomes active.
+    // We use shouldLoadRef and dataFetchStartedRef to prevent duplicate runs.
+    // hasBeenActive is NOT included because shouldLoadRef handles that case.
+  }, [apiClient, objMetadataMap, sObjectApiName, selectedParentRow, getLookupField, reloadNonce, enqueueSnackbar, action, isActive]);
+
+  // Reset dataFetchStartedRef when reloadNonce changes (manual refresh requested)
+  useEffect(() => {
+    if (reloadNonce > 0) {
+      dataFetchStartedRef.current = false;
+    }
+  }, [reloadNonce]);
+
+  // Effect 2: Build grid columns when view/data is ready
+  // Separated from data fetching to prevent query re-execution when view changes
+  useEffect(() => {
+    if (!initialDataLoaded || !selectedSubgridView || rowData.length === 0) {
+      return;
+    }
+
+    const metadata = objMetadataMap.current?.get(sObjectApiName) || null;
+    if (!metadata) {
+      return;
+    }
+
+    try {
+      const gridCols = createAgGridColumns({
+        apiClient,
+        isSubgrid: true,
+        zustandRef,
+        selectedObjMetadata: metadata,
+        selectedView: selectedSubgridView,
+        objMetadataMap,
+        currencyFormatter,
+        dateFormatter,
+        numberFormatter,
+        percentageFormatter,
+        nameFieldMap,
+        objectsWithoutNameFieldMap,
+        gridId,
+      } as any);
+
+      setColumnDefs(gridCols as ColDef[]);
+
+      // Resume saves after columns are set - delay to let AG Grid init events settle
+      setTimeout(() => {
+        initialApplyDoneRef.current = true;
+        resumeSaves('initial-load');
+      }, 200);
+    } catch {
+      // Fallback to basic cols if factory fails in this environment
+      const cols = buildBasicColumns(metadata, rowData);
+      setColumnDefs(cols);
+
+      // Resume saves even on fallback
+      setTimeout(() => {
+        initialApplyDoneRef.current = true;
+        resumeSaves('initial-load');
+      }, 200);
+    }
+  }, [apiClient, objMetadataMap, sObjectApiName, selectedSubgridView, initialDataLoaded, rowData, currencyFormatter, dateFormatter, numberFormatter, percentageFormatter, nameFieldMap, objectsWithoutNameFieldMap, gridId, buildBasicColumns, resumeSaves]);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const m = await import('ag-grid-community');
+
+        const scheme = (selectedTheme?.value === 'darkBlue') ? (m as any).colorSchemeDarkBlue : (m as any).colorSchemeLight;
+
+        if (alive) {
+          setAgThemeParts({ themeQuartz: (m as any).themeQuartz, colorScheme: scheme });
+        }
+      } catch {
+        if (alive) setAgThemeParts(null);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [selectedTheme?.value]);
+
+  // Auto-size columns when rows/defs change
+  useEffect(() => {
+    const api = gridApiRef.current;
+
+    if (!api || (api as any).isDestroyed?.()) {
+      return;
+    }
+
+    // Suspend saves during auto-sizing to prevent resize events from triggering saves
+    suspendSaves('auto-size');
+
+    // Use requestAnimationFrame + setTimeout to ensure DOM is fully painted
+    const rafId = requestAnimationFrame(() => {
+      setTimeout(() => {
+        const a = gridApiRef.current;
+
+        if (!a || (a as any).isDestroyed?.()) {
+          resumeSaves('auto-size');
+          return;
+        }
+
+        const allColumnIds = a.getColumns()?.map(col => col.getColId()) || [];
+
+        if (allColumnIds.length > 0) {
+          a.autoSizeColumns(allColumnIds, false);
+        }
+
+        // Resume saves after auto-sizing completes
+        // Use a small delay to ensure AG Grid events have settled
+        setTimeout(() => {
+          resumeSaves('auto-size');
+        }, 100);
+      }, 50);
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      // Ensure suspension is cleared if effect is cleaned up early
+      resumeSaves('auto-size');
+    };
+  }, [columnDefs, gridApiRef, rowData, suspendSaves, resumeSaves]);
+
+  // bump version whenever columnDefs change so tool panels can refresh safely
+  useEffect(() => {
+    setColDefsVersion(v => v + 1);
+  }, [columnDefs]);
+
+  // Toggle treeData like AppGrid when switching to Tree Grid
+  useEffect(() => {
+    const api: any = gridApiRef.current;
+
+    if (!api) return;
+
+    const isTree = (selectedSubgridType?.name === 'treeGrid') && (((relation as any)?.selectedGridType || 'gridView') === 'treeGrid');
+
+    if (isTree) {
+      const prefs: any = relationTreeGridPreferences as any;
+
+      const parentField: string | undefined = prefs?.parentLookupField;
+
+      const storedGroupField: string | undefined = prefs?.groupField || prefs?.AppGridAg__Group_Field__c;
+
+      const metadata: any = objMetadataMap.current?.get(sObjectApiName) as any;
+
+      const derivedNameField = (() => {
+        const fields = metadata?.fields;
+
+        if (!Array.isArray(fields) || !fields.length) return '';
+
+        const flagged = fields.find((f: any) => f?.isNameField);
+
+        if (flagged?.name) return flagged.name;
+
+        const fallback = fields.find((f: any) => f.name === 'Name');
+
+        if (fallback?.name) return fallback.name;
+
+        return fields[0]?.name || '';
+      })();
+
+      let resolvedGroupField = storedGroupField || derivedNameField || '';
+
+      if (prefs && derivedNameField && storedGroupField !== derivedNameField) {
+        resolvedGroupField = derivedNameField;
+
+        const updatedPrefs: any = {
+          ...(prefs as any),
+          groupField: derivedNameField,
+          AppGridAg__Group_Field__c: derivedNameField,
+        };
+
+        setSubgridTreeGridPreferences(updatedPrefs, relationName);
+      }
+
+      if (parentField && resolvedGroupField) {
+        // Guard against cross-object parent ids (e.g., AccountId in Case subgrid)
+        const childPrefix = ((objMetadataMap.current?.get(sObjectApiName) as any)?.keyPrefix) || String((rowData?.[0]?.Id || '')).slice(0, 3);
+
+        const sampleParentId: string | undefined = rowData?.find?.((r: any) => r && r[parentField])?.[parentField];
+
+        const parentPrefix = typeof sampleParentId === 'string' ? sampleParentId.slice(0, 3) : '';
+
+        if (childPrefix && parentPrefix && childPrefix !== parentPrefix) {
+          enqueueSnackbar('Tree Grid parent field points to a different object. Showing flat list (no tree).', { variant: 'info', autoHideDuration: 5000 });
+
+          api.setGridOption('treeData', false);
+
+          api.setGridOption('autoGroupColumnDef', undefined as any);
+
+          api.setGridOption('treeDataParentIdField', undefined as any);
+
+          setTreeDataActive(false);
+
+          return;
+        }
+
+        api.setGridOption('groupDisplayType', 'singleColumn');
+
+        setTreeDataActive(true);
+
+        api.setGridOption('treeDataParentIdField', parentField);
+
+        api.setGridOption('autoGroupColumnDef', { headerName: 'Hierarchy', field: resolvedGroupField, width: 300, cellRendererParams: { suppressCount: true } });
+
+        api.setGridOption('treeData', true);
+      }
+    } else {
+      api.setGridOption('treeData', false);
+
+      // Reset autoGroupColumnDef to default (without field property for non-tree mode)
+      api.setGridOption('autoGroupColumnDef', {
+        colId: '__auto_group__',
+        headerName: '',
+        width: 280,
+        pinned: 'left',
+        suppressMovable: true,
+        suppressHeaderMenuButton: true,
+        suppressColumnsToolPanel: true,
+        suppressFiltersToolPanel: true,
+        cellRenderer: 'agGroupCellRenderer',
+        cellRendererParams: {
+          suppressCount: true,
+          innerRenderer: (params: any) => {
+            if (params.node?.group || params.node?.level >= 0) {
+              return params.value;
+            }
+            return params.data?.Name ?? '';
+          },
+        },
+      });
+
+      api.setGridOption('treeDataParentIdField', undefined as any);
+
+      setTreeDataActive(false);
+    }
+  }, [gridApiRef, relation, relationName, relationTreeGridPreferences, selectedSubgridType?.name, rowData, objMetadataMap, sObjectApiName, enqueueSnackbar, setSubgridTreeGridPreferences]);
+
+  // Refresh handler: bump reloadNonce when toolbar publishes 'RefreshSubgridQuery'
+  useEffect(() => {
+    const token = PubSub.subscribe('RefreshSubgridQuery', () => {
+      setReloadNonce((n) => n + 1);
+    });
+
+    return () => {
+      PubSub.unsubscribe(token);
+    };
+  }, []);
+
+  // Open Column Manager dialog when requested via PubSub
+  useEffect(() => {
+    const tokenOpen = (PubSub as any).subscribe?.('OpenColumnsPanel', (_msg: any, data?: any) => {
+      // Only react to subgrid-scoped requests; ignore main grid
+      if (data && data.context === 'subgrid' && data.gridId === gridId) {
+        setShowColumnManager(true);
+      }
+
+    });
+
+    return () => {
+      PubSub.unsubscribe?.(tokenOpen);
+    };
+  }, [gridId]);
+
+  // Resume add flow after record type selection
+  useEffect(() => {
+    let prev = useStore.getState().showRecordTypeDialog;
+
+    const unsub = useStore.subscribe((state) => {
+      const show = state.showRecordTypeDialog;
+      if (addRowPendingRef.current && prev && !show) {
+        addRowPendingRef.current = false;
+        (async () => {
+          try {
+            const { record, openedRecordTypeDialog } = await buildNewRecord();
+
+            if (openedRecordTypeDialog) { addRowPendingRef.current = true; return; }
+
+            if (!record) {
+              return;
+            }
+
+            seedTaskWhatDefaults(record);
+
+            setSelectedRowLocal(record);
+
+            setSelectedSlackRow(record);
+
+            setGridEditDialogState({ show: true, gridId, isSubgrid: true, selectedView: selectedSubgridView! });
+          } catch (error: any) {
+            const msg = String(error?.message || 'An unknown error occurred');
+            prettyPrint('[Subgrid] Error in add record dialog', { message: error?.message, stack: error?.stack }, 'red');
+            enqueueSnackbar(msg, { action, variant: 'error', autoHideDuration: null });
+          }
+        })();
+      }
+      prev = show;
+    });
+
+    return () => { (unsub as any)?.(); };
+  }, [action, buildNewRecord, enqueueSnackbar, gridId, seedTaskWhatDefaults, selectedSubgridView, setGridEditDialogState, setSelectedSlackRow]);
+
+  // Clear gridApiRef on unmount and allow saved state to re-apply on next mount
+  useEffect(() => {
+    return () => {
+      gridApiRef.current = null;
+      initialApplyDoneRef.current = false;
+    };
+  }, [gridApiRef]);
+
+  // Subscribe to select-all events from the subgrid toolbar
+  useEffect(() => {
+    const token = PubSub.subscribe('SelectAllSubgridRecords', () => {
+      const api: any = gridApiRef.current;
+
+      if (!api || api.isDestroyed?.()) {
+        return;
+      }
+
+      const selectedCount = api.getSelectedNodes?.()?.length || 0;
+
+      if (selectedCount > 0) {
+        api.deselectAll?.();
+
+        setSelectAllToggle(false);
+      } else {
+        api.selectAll?.();
+
+        setSelectAllToggle(true);
+      }
+    });
+
+    return () => {
+      PubSub.unsubscribe(token);
+    };
+  }, [gridApiRef]);
+
+  // Toolbar events: Add (manual topic) for subgrid
+  useEffect(() => {
+    const addHandler = async () => {
+      try {
+        const { record, openedRecordTypeDialog } = await buildNewRecord();
+
+        if (openedRecordTypeDialog) {
+          addRowPendingRef.current = true;
+          return;
+        }
+
+        if (!record) {
+          return;
+        }
+
+        seedTaskWhatDefaults(record);
+
+        setSelectedRowLocal(record);
+
+        setSelectedSlackRow(record);
+
+        setGridEditDialogState({ show: true, gridId, isSubgrid: true, selectedView: selectedSubgridView! });
+      } catch (error: any) {
+        const msg = String(error?.message || 'An unknown error occurred');
+        prettyPrint('[Subgrid] Error in AddSubgridRow handler', { message: error?.message, stack: error?.stack }, 'red');
+        enqueueSnackbar(msg, { action, variant: 'error', autoHideDuration: null });
+      }
+    };
+
+    const t1 = PubSub.subscribe('AddSubgridRow', addHandler as any);
+
+    return () => {
+      PubSub.unsubscribe(t1);
+    };
+  }, [action, buildNewRecord, enqueueSnackbar, gridId, seedTaskWhatDefaults, selectedSubgridView, setGridEditDialogState, setSelectedSlackRow]);
+
+  // Toolbar events: Edit via scoped helper (prevents cross-grid toasts)
+  useGridToolbarEvents({
+    context: 'subgrid',
+    gridId,
+    onEdit: (recordId?: string | null) => {
+      try {
+        const api: any = gridApiRef.current;
+
+        let node;
+        // If recordId is provided (from row edit button), select that row
+        if (recordId && api) {
+          api.deselectAll();
+          node = api.getRowNode(recordId);
+          if (node) {
+            node.setSelected(true);
+          }
+        } else {
+          node = api?.getSelectedNodes?.()?.[0];
+        }
+
+        if (!node) {
+          enqueueSnackbar('Select a row to edit', { action, variant: 'info' }); return;
+        }
+
+        setSelectedRowLocal(node.data);
+
+        setSelectedSlackRow(node.data)
+
+        setGridEditDialogState({ show: true, gridId, isSubgrid: true, selectedView: selectedSubgridView! });
+      } catch (e: any) {
+        prettyPrint('[Subgrid] Error opening editor', { message: e?.message, stack: e?.stack }, 'red');
+        enqueueSnackbar(`Unable to open editor${e?.message ? ': ' + e.message : ''}`, { action, variant: 'error', autoHideDuration: null });
+      }
+    },
+  });
+
+  // Error column helpers for delete/save flows
+  const { showErrorColumn, showErrorRecords } = useErrorColumn({ getApi: () => gridApiRef.current as any });
+
+  // Hook to process Delete confirmation
+  const { deleteRecordsAction } = useDeleteHandlers({
+    context: 'subgrid',
+    getGridApi: () => gridApiRef.current as any,
+    deleteRecords: async (recordIds: string[], sObjectName: string) => {
+      const resp = await apiClient.deleteRecs(
+        {
+          recordIds: recordIds,
+          sObjectName: sObjectName,
+        });
+      if (resp.status !== 'success') {
+        throw new Error(resp.errorMessage || 'Delete operation failed');
+      }
+      return resp.results;
+    },
+    enqueue: (msg, opts) => enqueueSnackbar(msg, { ...opts, action }),
+    setRowError: (rowId: string, msg: string) => {
+      useStore.getState().setSubgridError(rowId, msg);
+    },
+    showErrorColumn: (visible: boolean) => showErrorColumn(visible),
+    showErrorRecords: (show: boolean) => showErrorRecords(show),
+    clearErrors: () => {
+      useStore.getState().clearSubgridErrors();
+    },
+    recordSObjectApiName: relation?.name as string,
+    onRecordsReload: emitRefreshSubgridQuery,
+  });
+
+  // Subscribe toolbar Delete to show confirmation dialog
+  useGridToolbarEvents({
+    context: 'subgrid',
+    gridId,
+    onDelete: async () => {
+      const api: any = gridApiRef.current;
+      const selectedCount = api?.getSelectedNodes?.()?.length || 0;
+      if (selectedCount === 0) {
+        enqueueSnackbar('Select at least one row to delete', { action, variant: 'info' });
+        return;
+      }
+      const confirmed = await showConfirmation(confirmationPresets.deleteRecord());
+      if (confirmed) {
+        await deleteRecordsAction();
+      }
+    },
+  });
+
+  // Subscribe to Delete Subgrid Filter topic
+  useEffect(() => {
+    const deleteFilterHandler = async () => {
+      if (!selectedSubgridFilter) {
+        enqueueSnackbar('Select a filter to delete', { action, variant: 'info' });
+        return;
+      }
+      const confirmed = await showConfirmation(confirmationPresets.deleteFilter(selectedSubgridFilter?.name));
+      if (confirmed) {
+        deleteFilter();
+      }
+    };
+    const deleteFilterToken = PubSub.subscribe('Delete Subgrid Filter', deleteFilterHandler);
+    return () => {
+      PubSub.unsubscribe(deleteFilterToken);
+    };
+  }, [showConfirmation, selectedSubgridFilter, deleteFilter, enqueueSnackbar, action]);
+
+  // Subscribe to Clear Subgrid Filters topic (mirrors main grid ClearFilters)
+  useEffect(() => {
+    const clearFiltersHandler = () => {
+      const api = gridApiRef.current;
+      if (api) {
+        api.setFilterModel(null);
+        api.setAdvancedFilterModel?.(null);
+      }
+      setAdvancedFilterState(null);
+      setFilterState(null);
+      setShowSubgridAdvancedFilter(false);
+      setSelectedSubgridFilter(null);
+      // Clear error decorations
+      useStore.getState().clearSubgridErrors();
+      showErrorRecords(false);
+      showErrorColumn(false);
+    };
+    const clearFiltersToken = PubSub.subscribe('Clear Subgrid Filters', clearFiltersHandler);
+    return () => {
+      PubSub.unsubscribe(clearFiltersToken);
+    };
+  }, [gridApiRef, setSelectedSubgridFilter, setShowSubgridAdvancedFilter, showErrorColumn, showErrorRecords]);
+
+  // Subscribe to ShowSubgridColumnStylePanel topic (mirrors main grid ShowColumnStylePanel)
+  useEffect(() => {
+    const showColumnStylePanelHandler = () => {
+      useStore.getState().setShowSubgridFormatColumnDialog(true);
+    };
+    const token = PubSub.subscribe('ShowSubgridColumnStylePanel', showColumnStylePanelHandler);
+    return () => {
+      PubSub.unsubscribe(token);
+    };
+  }, []);
+
+  // Subscribe to ShowCalculatedSubgridColumnPanel topic (mirrors main grid ShowCalculatedColumnPanel)
+  useEffect(() => {
+    const showCalculatedColumnPanelHandler = () => {
+      useStore.getState().setShowSubgridCalculatedColumnPanel(true);
+    };
+    const token = PubSub.subscribe('ShowCalculatedSubgridColumnPanel', showCalculatedColumnPanelHandler);
+    return () => {
+      PubSub.unsubscribe(token);
+    };
+  }, []);
+
+  // Subscribe to Delete Subgrid Template topic
+  useEffect(() => {
+    const deleteTemplateHandler = async () => {
+      const viewId = (selectedSubgridView as any)?.id || (selectedSubgridView as any)?.Id;
+      if (!viewId) {
+        enqueueSnackbar('Select a view to delete', { action, variant: 'info' });
+        return;
+      }
+      const confirmed = await showConfirmation(confirmationPresets.deleteTemplate(selectedSubgridView?.name));
+      if (confirmed) {
+        try {
+          const resp = await apiClient.deleteRecs(
+            {
+              recordIds: [viewId],
+              sObjectName: 'AppGridAg__AG_View__c',
+            });
+          if (resp.status !== 'success') {
+            throw new Error(resp.errorMessage || 'Delete operation failed');
+          }
+          // Reload views and select the first available view
+          const views = await reloadViews();
+          if (views.length > 0) {
+            setSubgridViewForRelation(sObjectApiName, views[0]);
+          }
+          enqueueSnackbar('View deleted', { action, variant: 'success', autoHideDuration: 2500 });
+        } catch (e: any) {
+          prettyPrint('[Subgrid] Error deleting view', { message: e?.message, stack: e?.stack }, 'red');
+          enqueueSnackbar(`Error deleting view${e?.message ? ': ' + e.message : ''}`, { action, variant: 'error', autoHideDuration: null });
+        }
+      }
+    };
+    const deleteTemplateToken = PubSub.subscribe('DeleteSubgridTemplate', deleteTemplateHandler);
+    return () => {
+      PubSub.unsubscribe(deleteTemplateToken);
+    };
+  }, [showConfirmation, selectedSubgridView, apiClient, reloadViews, enqueueSnackbar, action, sObjectApiName, setSubgridViewForRelation]);
+
+  // Subscribe to Create Subgrid Template topic
+  useEffect(() => {
+    const createTemplateHandler = () => {
+      setShowSubgridCreateTemplateDialog(true);
+    };
+    const createTemplateToken = PubSub.subscribe('CreateSubgridTemplate', createTemplateHandler);
+    return () => {
+      PubSub.unsubscribe(createTemplateToken);
+    };
+  }, [setShowSubgridCreateTemplateDialog]);
+
+  // Subscribe toolbar Save to useRecordSaver
+  useRecordSaver({
+    getGridApi: () => gridApiRef.current as any,
+    changedRows,
+    context: 'subgrid',
+    gridId,
+    metadata: objMetadataMap.current?.get(relation?.name as string) as any,
+    sObjectApiName: relation?.name as string,
+    apiClient,
+    enqueueSnackbar,
+    action,
+    onStart: () => setLoading(true),
+    onFinish: () => setLoading(false),
+    onSuccess: () => emitRefreshSubgridQuery(),
+  });
+
+  useEffect(() => {
+    const api = gridApiRef.current;
+    if (!api || !(rowData && rowData.length) || !pendingFiltersRef.current) return;
+
+    const { filterModel, advancedFilterModel } = pendingFiltersRef.current;
+
+    try {
+      api.setFilterModel(filterModel || null);
+
+      (api as any).setAdvancedFilterModel?.(advancedFilterModel || null);
+
+      syncSubgridFilterState();
+    } catch (err: any) {
+      enqueueSnackbar(`Unexpected error eapplying pending filters - ${err.message}`, {
+        action,
+        variant: 'error',
+        autoHideDuration: null,
+      })
+    } finally {
+      pendingFiltersRef.current = null;
+    }
+  }, [rowData, gridApiRef, syncSubgridFilterState, enqueueSnackbar, action]);
+
+  // Seed subgrid metadata and selected object for config panels
+  useEffect(() => {
+    try {
+      const sObj = (relation?.name as string);
+
+      if (!sObj) return;
+
+      const meta = objMetadataMap.current?.get(sObj) as SObjectMetadata | undefined;
+
+      if (meta) {
+        useStore.getState().setSelectedSubgridObjMetadata(meta as any);
+      }
+
+      if (orgObjects && Array.isArray(orgObjects)) {
+        const found = (orgObjects as any[]).find((o) => (o?.qualifiedApiName || o?.QualifiedApiName) === sObj);
+
+        if (found) {
+          useStore.getState().setSelectedSubgridObject(found as any);
+        }
+      }
+    } catch (e: any) {
+      prettyPrint('[Subgrid] Error seeding metadata/object', { message: e.message, stack: e.stack, relationName: relation?.name }, 'red');
+      enqueueSnackbar('Unable to seed subgrid metadata/object', { action, variant: 'error', autoHideDuration: null })
+    }
+  }, [relation?.name, objMetadataMap, orgObjects, enqueueSnackbar, action]);
+
+  // Handle row selection for Slack panel integration
+  const onRowSelected = useCallback((props: RowSelectedEvent) => {
+    const data = props.data;
+
+    const node = props.node;
+
+    if (node.isSelected()) {
+      setSelectedSlackRow(data);
+    } else {
+      setSelectedSlackRow(null);
+    }
+  }, [setSelectedSlackRow]);
+
+  /*==========================================
+  ** RENDER
+  ==========================================*/
+
+  return (
+    <GridProvider
+      isSubgrid={true}
+      gridId={gridId}
+      getGridApi={() => gridApiRef.current}
+    >
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1, width: '100%',
+        backgroundColor: theme.palette.background.paper,
+        color: theme.palette.text.primary,
+        position: 'relative'
+      }}>
+        {loading && hasBeenActive && <LoadingIndicator isLoading={loading} />}
+
+        {/* Subgrid view selector + toolbar */}
+        <Box sx={{ px: 2 }}>
+          <SubgridViewSelector
+            onViewChange={handleSubgridViewChange}
+            relationName={sObjectApiName} />
+        </Box>
+
+        <Box sx={{ px: 2 }}>
+          <SubgridToolbar
+            apiClient={apiClient}
+            gridId={gridId}
+            getGridApi={() => gridApiRef.current}
+            relationName={relation?.name}
+          />
+        </Box>
+
+        {/* AgGrid - only render when tab has been activated to prevent multiple grid instances */}
+        <Box
+          sx={{
+            height: 320,
+            // minHeight: 300,   doesn't work
+            flexGrow: 1,
+            width: '100%',
+            mb: 1,
+            px: 2,
+            // pb: 2
+          }}>
+          {hasBeenActive ? (
+            <AgGridReact
+              ref={gridRef}
+              components={{ columnsProxy: ColumnsProxyToolPanel }}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              autoGroupColumnDef={autoGroupColDef as any}
+              rowData={rowData}
+              getRowId={getRowId}
+              gridOptions={gridOptions}
+              onGridReady={onGridReady}
+              onFirstDataRendered={onFirstDataRendered}
+              rowSelection={rowSelection}
+              onRowSelected={onRowSelected}
+              onToolPanelVisibleChanged={(ev: any) => {
+                const id = ev?.key || ev?.toolPanelId || ev?.source || ev?.id;
+                const visible = ev?.visible ?? true;
+                if (visible && (id === 'columns' || id === 'columnsProxy')) {
+                  (document.activeElement as HTMLElement | null)?.blur();
+                  setShowColumnManager(true);
+                  setTimeout(() => (gridApiRef.current as any)?.closeToolPanel?.(), 50);
+                }
+              }}
+              onColumnMoved={onColumnMoved}
+              onFilterChanged={handleSubgridFilterChanged}
+              onColumnVisible={handleColumnVisible}
+              onColumnPinned={handleColumnPinned}
+              onColumnResized={handleColumnResized}
+              onColumnRowGroupChanged={handleColumnRowGroupChanged}
+              onColumnPivotModeChanged={handleColumnPivotModeChanged}
+              onColumnPivotChanged={handleColumnPivotChanged}
+              onColumnValueChanged={handleColumnValueChanged}
+              onSortChanged={handleSortChanged}
+              onCellValueChanged={({ data }: any) => {
+                // Cell editing is user-initiated, enable saves
+                userHasInteractedRef.current = true;
+                const id = data?.Id;
+                if (id) addChangedRowId(String(id));
+              }}
+              onStateUpdated={gridEvents.onStateUpdated}
+              suppressCellFocus={true}
+              domLayout="normal"
+              overlayNoRowsTemplate="No related records"
+              theme={agThemeParts?.themeQuartz?.withPart?.(agThemeParts?.colorScheme) || undefined}
+              sideBar={sideBar}
+              statusBar={statusBar}
+              masterDetail={false}
+            />
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'text.secondary' }}>
+              Select this tab to load data
+            </Box>
+          )}
+        </Box>
+
+        {/* Subgrid Custom Column Manager (same component family as parent) */}
+        <AgColumnManager
+          open={showColumnManager}
+          onClose={() => setShowColumnManager(false)}
+          gridApi={gridApiRef.current as any}
+          setPivot={setPivotFromManager}
+          metadata={objMetadataMap.current?.get(relation?.name as string) as any}
+          apiClient={apiClient}
+          saveAgGridState={saveAgGridState}
+          selectedView={selectedSubgridView}
+          onParentFieldsChange={handleParentFieldsChange}
+          setSelectedView={setSelectedSubgridView}
+        />
+
+        {/* Grid Edit Dialog (Subgrid) */}
+        {gridEditDialogState.show && gridEditDialogState.gridId === gridId && (() => {
+          const api: any = gridApiRef.current;
+
+          const selectedRow = selectedRowLocal || api?.getSelectedNodes?.()?.[0]?.data || null;
+
+          const objMeta = objMetadataMap.current?.get(relation?.name as string);
+
+          const current: any = api ? { gridState: api.getState?.() ?? {}, columnState: api.getColumnState?.() ?? [] } : { gridState: {}, columnState: [] };
+
+          if (!selectedRow || !objMeta) return null;
+
+          return (
+            <GridEditDialog
+              apiClient={apiClient}
+              currentState={current}
+              isTimeSeriesView={false}
+              isSubgrid={true}
+              objFieldPermissionsMap={objFieldPermissionsMap as any}
+              objMetadata={objMeta as any}
+              objMetadataMap={objMetadataMap as any}
+              selectedRow={selectedRow}
+              onClose={handleCloseGridEditDialog}
+            />
+          );
+        })()}
+
+        {/* Note: Delete dialogs now use unified ConfirmationDialog from AppGrid */}
+
+        {showRecordTypeDialog && <RecordTypeDialog />}
+
+        {/* Create Filter Dialog (subgrid) */}
+        {showSubgridCreateFilterDialog && (
+          <CreateFilterDialog
+            title="Save Filter"
+            onSave={async (name: string) => {
+              try {
+                await onFilterNameCreated(name);
+                enqueueSnackbar('Filter saved', { action, variant: 'success', autoHideDuration: 2500 });
+              } catch (e: any) {
+                prettyPrint('[Subgrid] Error saving filter', { message: e?.message, stack: e?.stack }, 'red');
+                enqueueSnackbar(`Error saving filter${e?.message ? ': ' + e.message : ''}`, { action, variant: 'error', autoHideDuration: null });
+              }
+            }}
+          />
+        )}
+
+        {/* Create Template Dialog (subgrid) */}
+        {showSubgridCreateTemplateDialog && (
+          <CreateTemplateDialog
+            onSave={async (name: string) => {
+              try {
+                await onTemplateNameCreated(name);
+                await reloadViews();
+                enqueueSnackbar('View saved', { action, variant: 'success', autoHideDuration: 2500 });
+              } catch (e: any) {
+                prettyPrint('[Subgrid] Error saving view', { message: e?.message, stack: e?.stack }, 'red');
+                enqueueSnackbar(`Error saving view${e?.message ? ': ' + e.message : ''}`, { action, variant: 'error', autoHideDuration: null });
+              }
+            }}
+          />
+        )}
+
+        {/* Delete Template Dialog - now using unified ConfirmationDialog */}
+
+        {/* Advanced Filter Builder (subgrid) */}
+        <AdvancedFilterBuilder
+          isSubgrid={true}
+          gridApi={gridApiRef.current}
+          selectedObjMetadata={objMetadataMap.current?.get(sObjectApiName) as any}
+          apiClient={apiClient}
+        />
+
+        {/* Mass Edit Dialog (subgrid) */}
+        <MassEditDialog
+          open={massEditDialogOpen}
+          onClose={() => {
+            setMassEditDialogOpen(false);
+            setMassEditColumn(null);
+          }}
+          gridApi={gridApiRef.current}
+          column={massEditColumn}
+          metadata={objMetadataMap.current?.get(sObjectApiName) ?? null}
+          apiClient={apiClient}
+          objMetadataMap={objMetadataMap}
+          addChangedRow={addChangedRowId}
+        />
+      </Box>
+    </GridProvider>
+  );
+};
+
+export default SubgridCore;

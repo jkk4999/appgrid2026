@@ -1,0 +1,26 @@
+{
+  "plugins": ["prettier-plugin-apex"],
+  "trailingComma": "none",
+  "tabWidth": 2,
+  "semi": true,
+  "singleQuote": true,
+  "bracketSameLine": false,
+  "overrides": [
+    {
+      "files": "*.cls",
+      "options": { "parser": "apex" }
+    },
+    {
+      "files": "*.trigger",
+      "options": { "parser": "apex" }
+    },
+    {
+      "files": "*.apex",
+      "options": { "parser": "apex-anonymous" }
+    },
+    {
+      "files": "*.ts",
+      "options": { "parser": "typescript" }
+    }
+  ]
+}

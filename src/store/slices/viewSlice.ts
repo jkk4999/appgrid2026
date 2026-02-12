@@ -1,0 +1,98 @@
+/**
+ * View Slice
+ *
+ * Manages view-related state including selected views, view options,
+ * filters, and pivot mode settings.
+ */
+
+import { createSliceWithSetters } from '../createSlice';
+import type { SObjectView, FilterOption } from '../types';
+
+// ============================================================
+// NORMALIZERS
+// ============================================================
+
+/** Normalizes a view record from Salesforce format to app format */
+const normalizeViewRecord = (view: unknown): SObjectView | null => {
+  if (!view || typeof view !== 'object') return null;
+
+  const v = view as Record<string, unknown>;
+  const rawId = v.id ?? v.Id ?? null;
+  const id = rawId != null ? String(rawId) : undefined;
+
+  return {
+    ...v,
+    id,
+    name: String(v.name ?? v.Name ?? ''),
+    columnState: v.columnState ?? v.AppGridAg__Column_State__c ?? '',
+    gridState: v.gridState ?? v.AppGridAg__Grid_State__c ?? '',
+    calculatedColumns:
+      v.calculatedColumns ?? v.AppGridAg__Calculated_Columns__c ?? '',
+    columnStyles: v.columnStyles ?? v.AppGridAg__Column_Styles__c ?? '',
+    rowStyles: v.rowStyles ?? v.AppGridAg__Row_Styles__c ?? '',
+    filterOptions: v.filterOptions ?? v.AppGridAg__FilterOptions__c ?? '',
+    isSubgridView: Boolean(v.isSubgridView ?? v.AppGridAg__IsSubgridView__c),
+    pivotMode: Boolean(v.pivotMode ?? v.AppGridAg__Pivot_Mode__c),
+    showAdvancedFilter: Boolean(
+      v.showAdvancedFilter ?? v.AppGridAg__ShowAdvancedFilter__c
+    ),
+    sObjectApiName: String(
+      v.sObjectApiName ?? v.AppGridAg__SObjectApiName__c ?? ''
+    ),
+    parentFields: v.parentFields ?? v.AppGridAg__Parent_Fields__c ?? undefined
+  } as SObjectView;
+};
+
+/** Normalizes an array of view records (never returns null) */
+const normalizeViewArray = (
+  views: unknown[] | null | undefined
+): SObjectView[] => {
+  if (!Array.isArray(views)) return [];
+  return views
+    .map(normalizeViewRecord)
+    .filter((v): v is SObjectView => v !== null);
+};
+
+// ============================================================
+// INITIAL STATE
+// ============================================================
+
+const viewState = {
+  selectedView: null as SObjectView | null,
+  selectedViewProcessed: false,
+  selectedViewRecordId: '',
+  viewOptions: [] as SObjectView[], // ✅ never null
+  objViewsRetrieved: false,
+  filterOptions: [] as FilterOption[],
+  selectedFilter: null as FilterOption | null,
+  isFilterActive: false,
+  showAdvancedFilter: false,
+  pivotMode: false
+};
+
+// ============================================================
+// SLICE CREATOR
+// ============================================================
+
+export const createViewSlice = createSliceWithSetters(viewState, (set) => ({
+  // Normalize single view
+  setSelectedView: (view: SObjectView | null) =>
+    set({
+      selectedView: view ? normalizeViewRecord(view) : null
+    }),
+
+  // Fully updater-safe setter - always normalizes result
+  setViewOptions: (
+    updater: SObjectView[] | ((prev: SObjectView[]) => SObjectView[])
+  ) =>
+    set((state) => ({
+      viewOptions: normalizeViewArray(
+        typeof updater === 'function'
+          ? updater(state.viewOptions)
+          : updater
+      )
+    }))
+}));
+
+// Export normalizers for use elsewhere
+export { normalizeViewRecord, normalizeViewArray };

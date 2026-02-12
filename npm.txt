@@ -1,0 +1,5 @@
+// outdated local packages
+npm outdated
+
+// update to latest
+npm install packageName@latest

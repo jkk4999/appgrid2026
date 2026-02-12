@@ -1,0 +1,12 @@
+In this video, we will review how each user can configure app-grid to show their relationship preferences.  
+
+
+Relation preferences are used to define what subgrids are displayed when you expand a grid row.  The relation preferences wizard is context sensitive to the current selected object.  For example, if we currently viewing Accounts then the relation preferences wizard will allow us to define those preferences.  
+
+To open the relation preferences wizard, click the ellipse button in the toolbar and select Objects from the dropdown menu.  Click the Relationships tab.  Check the relationships you will use frequently in your workflows and uncheck the rest. 
+
+By default, unless the user (or their system admin) has configured their relation preferences, no related data will be shown.
+
+The ability to view the object preferences button is determined by a grid permission assignment.  See the 'Configure grid permissions' video for more information.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@appGridSoftware.com or visit our website www.appGridSoftware.com.  Thank you for watching.

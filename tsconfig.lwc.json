@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    // Only include the specific entry point for the LWC build.
+    "src/index.lwc.tsx",
+    "src/custom.d.ts"
+  ],
+  "exclude": [
+    "src/index.tsx" // Explicitly exclude the non-LWC entry point to avoid conflicts.
+  ]
+}

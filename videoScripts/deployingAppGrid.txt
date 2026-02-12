@@ -1,0 +1,47 @@
+In this video, we will discuss the best practices for deploying appGrid to your users. 
+
+Each user of appGrid has a unique configuration of settings and permissions that control the user experience. As a user interacts with the app, appGrid will save the state of the app to the users configuration automatically. appGrid will work without setting an initial configuration, but setting user entitlements, permissions, object and relation preferences, views, conditional styling, queries and other features for a given type of user prior to rollout will improve the user experience for new users of the app. 
+
+By default, all appGrid features and permissions are enabled for a user if an initial configuration is not found, therefore it is highly recommended to follow these best practices prior to rollout.  Prior to configuring a new user, read, understand and use the various features of appGrid.
+
+appGrid provides a user configuration wizard that enables cloning an existing user or template configuration and assigning to one or more selected users. The configuration wizard will clone the app configuration, queries, object/relation preferences and grid permissions associated with the selected user or template. Conceptually, this is similar to a Salesforce profile in that it defines what features are enabled for a user. 
+
+To open the configuration wizard, click the configuration settings button in the grid menu. Note, the visibility of this button is based on a user permission, which is likely assigned to system administrators only.
+
+Configuring users via a template is the preferred method, as the template properties will not change over time.  In contrast, when you clone a user config, that state will be continously updated as that user interacts with the application.
+
+In most cases, the preferred way to assign a configuration to a user is through a template.
+
+Now let's discuss in detail the process of onboarding new users.
+
+When configuring app-grid prior to rollout, we will typically have multiple types of users spanning several profiles such as sales or support. The most efficient way to configure appGrid is to configure all users assigned to a given profile and then move to the next profile type.  The user creation workflow starts with a person (typically a system administrator) use the app to configure the settings appropriate for the profile type.  
+
+Step 1:  Create a permission set that will be assigned to a given set of app-grid users.  The app-grid package contains a permission set named 'appGrid permission set' which you can use and customize as required.  Assign that permission set to the users.  If you have multiple types of users that have different requirements for app-grid features and permissions, then create a permission set for each user type.
+
+Step 2:  As a system administrator, use the Salesforce Login-As feature to log into a user account with a specific Salesforce profile, for example Sales. Let's login as Andy Wicker.  Then open the app-Grid application.
+
+Click on the object selector.  The object list contains all objects the user has permissions to read.  The object selector list is sorted by Name so the first object in this org is Account.
+
+Notice that we have an error message that tells us we need to create a query for the object.  Let's dismiss that for now.
+
+Also notice that appGrid has created a default view for us appropriately named 'default view'.  We will be creating our preferred views for this user in a following step.
+
+Step 3:  Open the object preferences panel and select what objects you want this configuration to have. This step determines what objects will be displayed in the object dropdown selector. Close the object preferences panel.
+
+Step 4: - using the objects selector in the toolbar, select an object and open the object preferences panel. Select the relationships tab and enable one or more relationships if desired. Close the object preferences panel. Open the QueryBuilder wizard and create 1 or more queries as required. Close the QueryBuilder wizard.
+
+Step 5: - Open the app settings wizard by clicking the toolbar button and create 1 or more views. Tip - create your first view (for example, a table view) and arrange the columns as preferred. Then, if creating multiple views, clone this view instead of creating from new.
+
+Step 6 - repeat steps 4 and 5 for each object in the object dropdown selector
+
+Step 7: - open the permissions panel by clicking the toolbar button. select what app-Grid wizard and permissions are to be enabled for this type of user. For non sys-admin users, the Enable Permissions Panel & Enable Configuration Wizard permissions should not be checked.
+
+Step 8 - Next, we want to save this configuration as a template.  Open the configurations panel.  Click the save button in the USER CONFIG tab.  Enter a name for the template and click 'Submit'.  Let's name this template 'Sales'.
+
+Step 9 - log out of the app and close the LoginAs session. Log into Salesforce with your admin account.
+
+Step 10 - open the configurations panel. select the TEMPLATE tab. Search for the template name you created.  Select the template you want to use. Select one or more users to assign the template to in the users grid. Filter the grid if desired to narrow down the list of users. Click the CLONE button. The template configuration will be assigned to each selected user.
+
+Step 11 - repeat steps 2 - 10 for each type of profile
+
+Step 12 - As system administrator, using the Salesforce LoginAs feature to login as each type of user.  Verify that the object, relation, views, queries and permissions properties are working as expected.

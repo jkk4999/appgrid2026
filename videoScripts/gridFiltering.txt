@@ -1,0 +1,38 @@
+In this video, we will review the grid filtering capabilities of app-grid, our industry leading lightning web component application for Salesforce.  
+
+Once we have executed a query, it is quite common to further refine the query results by filtering.  app-grid provides 2 ways to filter your query data - column filters and grid filters.  
+
+Unlike column filters, a grid filter expression can reference multiple columns and include AND/OR logic to create very specific rules that satisfy a business need to view a certain set of records.
+
+In this view, we have selected to view orders and ran a query to retrieve all open orders.  
+
+Let’s create a grid filter to show only those orders received this month AND where the status is Attempted Delivery OR Delayed OR the Order Amount is greater than $2000.
+
+To create a grid filter, click on the settings button in the grid toolbar.  You can create a grid filter using the expression editor or the query builder.  The query builder provides a drag and drop graphical editor, which makes it easy to create filter expressions.  The expression editor provides more features which may be required to create complex expressions.  In either case, a grid filter is a function that must evaluate to either true or false.  If you enter an invalid expression, the editor will display an error message.  
+
+To create our filter, we will use the query builder.  Click on the Query Builder tab.  Select And for the top level filter operation.  Click the plus icon to add a filter condition.  Enter the Order Start Date condition by entering the column, operator and value.  
+
+Click the plus icon to add another filter condition.  Enter the Order End Date condition.
+
+Let's add a filter group condition.  Click the plus icon and select add group.
+
+Click the plus icon within the group and select add condition.
+
+Select Order Status for the field.  Select IN for the operator.  Enter Attempted Delivery and Delayed for the value.  The grid filter supports entering multiple values for a picklist field which is a really nice feature.
+
+Click the plus icon and select add condition.
+
+Enter Order Amount greater than 2000.
+
+Change the logical operator for this group to OR.  Close the grid filter panel.
+
+We can also apply additional column filters to the result.  Select the Order Amount column filter operator and change it to greater than.  Enter 4000 for the value.  Notice the grid filter icon displayed in the toolbar indicating we have applied column filters.
+
+Enter Delayed into the Order status field.
+
+The grid filter editors make it easy for users to filter their query results to find the exact set of records needed for a business process.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@appGridSoftware.com or visit our website.  Thank you for watching.
+
+
+

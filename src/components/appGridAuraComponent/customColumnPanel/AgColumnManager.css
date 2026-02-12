@@ -1,0 +1,10 @@
+.agcm .agcm-hide-header .ag-header,
+.agcm .agcm-hide-header .ag-header-viewport,
+.agcm .agcm-hide-header .ag-header-container {
+  display: none !important;
+}
+
+.agcm .ag-root-wrapper,
+.agcm .ag-root {
+  border: none;
+}

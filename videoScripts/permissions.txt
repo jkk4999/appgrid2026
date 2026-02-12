@@ -1,0 +1,31 @@
+In this video, we will review how to configure user permissions. In the current view, we are dislaying a list of Accounts.
+
+User permissions control what features are enabled for a given user.  This means that when we open the user permissions panel, we are viewing the permissions for the given user.  Note, usually only system administrators are assigned the enable permission panel permission. This button will not be visible to users who have not been assigned the enable permission panel permission.
+
+Note: see the deployment video for information on how to configure the permissions for users prior to deployment.
+
+app-grid is an entirely configuration and permission driven app.  we can configure the application with a minimum level of features that might be appropriate for customer or partner views where we want to make the application easy to use and require minimal to no training.  conversely, we may have power uses or admins that require the full set of features that app-grid provides.
+
+There are two types of permissions in app-grid, wizard permissions and grid permissions.  app-grid provides a graphical wizard the enables users to easily define views, conditional formatting, calculated columns, alerts and other features.  To open the wizard, click the app settings button in the grid toolbar.  The wizard permssions control which of these features are enabled for a given user.
+
+Click the permissions icon in the grid menu to open the permissions panel.  
+
+In the wizard features tab, the permissions are grouped by feature type.  If we expand the Alert permissions, we have permissions to create, delete and edit alerts in addition to add to view and remove from view permissions.  Check each permission we want to assign to this user.
+
+Similarly, we have permissions for calculated columns, export, flashing and styled cells.
+
+Grid permissions control what application features are enabled for a given user.  Click on the grid permissions tab.  By default, all permissions are enabled for new users.  
+
+There is currently a chart selector displayed in the grid toolbar.  We can select a predefined chart to display above the grid.  To remove this feature, uncheck the Enable charts permission.  Notice the chart selector in now hidden.
+
+Permissions to access the object panel are usually only given to system administrators.  To remove this feature for a given user, uncheck the Enable object panel permission.
+
+The configuration wizard is used to set the permissions for all users prior to deployment.  Permissions to access the configuration panel are usually only given to system administrators.  To remove this feature for a given user, uncheck the Enable configuration panel permission.
+
+The object flows panel in the grid toolbar displays a selector which allows users to execute Salesforce flows.  In the grid menu, there is a button to configure flows.  To remove this feature for a given user, uncheck the configure flows panel permission.
+
+app-grid provides a query builder wizard that makes it easy for users to define complex queries to return records that are needed for a give business process.  To remove this feature for a given user, uncheck the Enable query builder permission.
+
+Currently, there is a arrow button next to each Account record.  Clicking that button will display related information to Accounts.  If we wanted to remove that permission, uncheck the Enable sub-grids permission.  Notice that the grid no longer allows this user to view related information in the grid.
+
+app-grid provides 3 main types of views - list, kanban and time series.  in the grid toolbar, there is a view selector.  by default, the grid will display records in the list view.  if we wish to remove the ability for a given user to change the view type, uncheck the Enable enable view types permission

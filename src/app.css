@@ -1,0 +1,251 @@
+/*
+ * ===================================================================
+ * Comprehensive Fix for Syncfusion Gantt Edit Dialog Layout
+ * ===================================================================
+*/
+
+/*
+ * FIX 1: Add top padding to the main content area of the tabs.
+ * This prevents the first form field from being clipped by the top edge.
+ * This rule is generic and applies to the content of ALL tabs.
+*/
+.e-gantt-dialog .e-tab .e-content {
+  padding-top: 20px !important;
+  box-sizing: border-box;
+}
+
+/*
+ * FIX 2: Correct the vertical position of the floating labels.
+ * This fixes the issue where labels float too high above their input fields.
+*/
+.e-gantt-dialog .e-float-input.e-control-wrapper .e-float-text.e-label-top {
+  transform: translateY(-16px) scale(0.92) !important;
+}
+
+.gu-mirror {
+  pointer-events: none;
+}
+
+.ag-picker-field-wrapper {
+  z-index: 2000 !important;
+}
+
+/* Ensure MUI Autocomplete dropdown appears above Aura/Lex overlays */
+.MuiAutocomplete-popper {
+  z-index: 2147483647 !important; /* ensure above Salesforce overlays */
+}
+
+/* Align Syncfusion QueryBuilder rule controls so custom MUI editors line up */
+.e-querybuilder .e-rule-content,
+.e-query-builder .e-rule-content,
+.e-querybuilder .e-rule-container,
+.e-query-builder .e-rule-container,
+.e-querybuilder .e-rule-container.e-horizontal-mode,
+.e-query-builder .e-rule-container.e-horizontal-mode {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-end !important;
+  gap: 12px !important;
+}
+
+.e-querybuilder .e-rule-container > .e-rule-field,
+.e-querybuilder .e-rule-container > .e-rule-operator,
+.e-querybuilder .e-rule-container > .e-rule-value,
+.e-querybuilder .e-rule-container > .e-rule-delete,
+.e-querybuilder .e-horizontal-mode > .e-rule-field,
+.e-querybuilder .e-horizontal-mode > .e-rule-operator,
+.e-querybuilder .e-horizontal-mode > .e-rule-value,
+.e-querybuilder .e-horizontal-mode > .e-rule-delete,
+.e-query-builder .e-rule-container > .e-rule-field,
+.e-query-builder .e-rule-container > .e-rule-operator,
+.e-query-builder .e-rule-container > .e-rule-value,
+.e-query-builder .e-rule-container > .e-rule-delete,
+.e-query-builder .e-horizontal-mode > .e-rule-field,
+.e-query-builder .e-horizontal-mode > .e-rule-operator,
+.e-query-builder .e-horizontal-mode > .e-rule-value,
+.e-query-builder .e-horizontal-mode > .e-rule-delete {
+  display: flex;
+  align-items: flex-end;
+  margin: 0;
+}
+
+.e-querybuilder .e-rule-container > .e-rule-field,
+.e-query-builder .e-rule-container > .e-rule-field {
+  order: 0;
+}
+
+.e-querybuilder .e-rule-container > .e-rule-operator,
+.e-query-builder .e-rule-container > .e-rule-operator {
+  order: 1;
+  width: 200px !important; /* Increased by 50px from default ~150px */
+  flex-shrink: 0; /* Prevent flexbox from shrinking this element */
+}
+
+.e-group-container {
+  width: 100%;
+  flex-grow: 1;
+}
+
+/* Override Syncfusion's inline width: 100% on operator dropdown */
+.e-querybuilder .e-rule-operator .e-control-wrapper.e-ddl,
+.e-query-builder .e-rule-operator .e-control-wrapper.e-ddl {
+  width: 200px !important; /* Match parent container width */
+}
+
+.e-querybuilder .e-rule-container > .e-rule-value,
+.e-query-builder .e-rule-container > .e-rule-value {
+  order: 2;
+  min-width: 250px; /* Increased by 50px from 200px */
+  width: auto !important;
+  flex: 1 1 auto;
+}
+
+.e-querybuilder .e-rule-container > .e-rule-delete,
+.e-query-builder .e-rule-container > .e-rule-delete {
+  order: 3;
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+  min-height: 32px;
+  flex-shrink: 0;
+}
+
+.e-querybuilder .e-rule-value-delete,
+.e-query-builder .e-rule-value-delete {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: 12px;
+  transform: translateY(-4px);
+}
+
+.e-querybuilder .e-rule-value,
+.e-query-builder .e-rule-value {
+  width: auto !important;
+}
+
+/* Override Syncfusion Material 3 dark mode QueryBuilder rule background color */
+.e-dark-mode .e-querybuilder .e-rule-container,
+.e-dark-mode .e-query-builder .e-rule-container,
+.e-dark-mode .e-querybuilder .e-rule-container.e-horizontal-mode,
+.e-dark-mode .e-query-builder .e-rule-container.e-horizontal-mode {
+  background-color: #363636 !important;
+}
+
+/* Also override the group container background for consistency */
+.e-dark-mode .e-querybuilder .e-group-container,
+.e-dark-mode .e-query-builder .e-group-container {
+  background-color: #2d2d2d !important;
+}
+
+/*
+ * ===================================================================
+ * Dark Mode Fix for Pivot View Group Column Text Color
+ * ===================================================================
+ * AG-Grid v33+ uses the Theming API with themeQuartz.withPart(colorSchemeDark)
+ * instead of the legacy .ag-theme-quartz-dark class. The app uses .e-dark-mode
+ * on the body element for dark mode detection (synced with Syncfusion).
+ *
+ * The group column text (Industry, Ownership, etc.) in pivot view does not
+ * inherit the foregroundColor from withParams, so we explicitly set it here.
+ */
+.e-dark-mode .ag-group-value,
+.e-dark-mode .ag-group-child-count,
+.e-dark-mode .ag-row-group .ag-cell .ag-group-value,
+.e-dark-mode .ag-row-group .ag-cell .ag-group-child-count,
+.e-dark-mode .ag-cell[col-id^='ag-Grid-AutoColumn'] .ag-group-value,
+.e-dark-mode .ag-cell[col-id^='ag-Grid-AutoColumn'] .ag-group-child-count,
+.e-dark-mode .ag-cell-wrapper .ag-group-value,
+.e-dark-mode .ag-cell-wrapper .ag-group-child-count {
+  color: #ffffff !important;
+}
+
+/* Also fix icons in dark mode group columns */
+.e-dark-mode .ag-row-group .ag-cell .ag-icon,
+.e-dark-mode .ag-cell[col-id^='ag-Grid-AutoColumn'] .ag-icon,
+.e-dark-mode .ag-group-contracted .ag-icon,
+.e-dark-mode .ag-group-expanded .ag-icon {
+  color: #ffffff !important;
+}
+
+/*
+ * ===================================================================
+ * Dark Mode Fix for AG-Grid Integrated Charts
+ * ===================================================================
+ * The chart toolbar and tool panels need dark mode styling.
+ * The accent color is applied via CSS custom property set by React.
+ */
+
+/* Chart toolbar/menu background in dark mode */
+.e-dark-mode .ag-chart-menu-wrapper,
+.e-dark-mode .ag-chart-menu,
+.e-dark-mode .ag-chart-settings-wrapper,
+.e-dark-mode .ag-chart-data-wrapper,
+.e-dark-mode .ag-chart-format-wrapper {
+  background-color: #1e1e1e !important;
+  color: #ffffff !important;
+}
+
+/* Chart tool panel tabs and headers */
+.e-dark-mode .ag-chart-menu-tabs,
+.e-dark-mode .ag-chart-settings-nav-bar,
+.e-dark-mode .ag-chart-menu-toolbar {
+  background-color: #2d2d2d !important;
+  border-color: #404040 !important;
+}
+
+/* Chart tool panel content */
+.e-dark-mode .ag-chart-menu-panel,
+.e-dark-mode .ag-chart-settings-mini-wrapper,
+.e-dark-mode .ag-charts-format-top-level-groups {
+  background-color: #1e1e1e !important;
+  color: #ffffff !important;
+}
+
+/* Chart tool panel labels and text */
+.e-dark-mode .ag-chart-menu-panel label,
+.e-dark-mode .ag-chart-menu-panel span,
+.e-dark-mode .ag-chart-settings-wrapper label,
+.e-dark-mode .ag-chart-settings-wrapper span,
+.e-dark-mode .ag-charts-format-sub-level-group-title,
+.e-dark-mode .ag-charts-format-top-level-group-title {
+  color: #ffffff !important;
+}
+
+/* Chart tool panel inputs */
+.e-dark-mode .ag-chart-menu-panel input,
+.e-dark-mode .ag-chart-menu-panel select,
+.e-dark-mode .ag-chart-settings-wrapper input,
+.e-dark-mode .ag-chart-settings-wrapper select {
+  background-color: #363636 !important;
+  color: #ffffff !important;
+  border-color: #555555 !important;
+}
+
+/* Chart tool panel icons */
+.e-dark-mode .ag-chart-menu-icon,
+.e-dark-mode .ag-chart-menu-toolbar-button,
+.e-dark-mode .ag-chart-settings-nav-bar .ag-icon {
+  color: #ffffff !important;
+}
+
+/* Chart toolbar close button and other action buttons */
+.e-dark-mode .ag-chart-menu-close,
+.e-dark-mode .ag-chart-tool-panel-button {
+  color: #ffffff !important;
+}
+
+/* Dropdown menus within chart panels */
+.e-dark-mode .ag-picker-field-wrapper {
+  background-color: #363636 !important;
+  border-color: #555555 !important;
+}
+
+.e-dark-mode .ag-picker-field-display {
+  color: #ffffff !important;
+}
+
+/* Hide Advanced Filter Builder button */
+.ag-advanced-filter-builder-button {
+  display: none !important;
+}

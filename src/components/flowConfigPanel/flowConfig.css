@@ -1,0 +1,19 @@
+.my-json-view {
+   font-size: 16px; /* Increase font size (relative to parent) */
+   line-height: 1.5; /* Adjust line height for readability */
+ }
+ 
+ /* Target buttons specifically (more reliable than inline styles) */
+ .my-json-view .rjv-button {
+     padding: 6px 12px; /* Adjust padding */
+     font-size: 16px; /* Match font size to text, or adjust as needed */
+ }
+ 
+ .my-json-view .rjv-collapse-triangle{ /* target the collapse triangle. change the size by modifying font-size */
+     font-size: 16px;
+ }
+ 
+ /* Target other specific elements (use your browser's developer tools to inspect the elements) */
+ .my-json-view .rjv-value-string {
+     color: #008000;  /* example - change string color */
+ }

@@ -1,0 +1,51 @@
+In this video, we will review how each user can configure app-grid to display their list view preferences.  
+
+app-grid is a native lightning web component application that delivers powerful query, filtering, presentation and personalization features that delight users and increase productivity.  
+
+An appGrid view has a columns property.  The columns property controls what fields are displayed in the grid.  
+
+There are two major types of columns:  
+   1 - value columns have their field bound to a property in the data object
+   2 - calculated columns are columns which have their value computed using an AppGrid QL expression
+
+In this video, we will focus on creating bound columns.  See the video 'Creating calculated columns' for more information.
+
+An app-grid view is a set of properties that define what information will be displayed for a given object.  A user can create multiple views for a given object.  app-grid provides 4 types of views: list, pivot, time series and kanban.
+
+In this video, we will focus on creating list views.  
+
+List Views show columns in standard tabular format.  List views can also be grouped.
+
+In this grid, we have selected to view Contacts and ran a query to retrieve all Contacts.
+
+In this case, a view preference for Contacts was not found so app-grid created a default list view.  We will always want to configure the default view with our preferences, because the default view will not be optimized for a given workflow.
+
+To access the view settings, click the settings button in the grid toolbar.  Click the 'App Settings' tab.
+
+The view settings panel allows us to create a new view, delete a view or clone a view.
+
+Click on the View menu item.  Let's change the view name to 'Contacts'.
+
+Now we will configure the view columns.  Click on the 'Columns' menu item.  A list of columns will be displayed.  By default, all columns are selected.  Given the large amount of fields on the contact object, i'm going to remove the selection.  Scroll the column list to the bottom and click 'clear selection'.  
+
+Drag the columns to arrange them in the desired order.  You can also find a field by typing the field name into the search box.  Checking a column will make it visible.  Clicking the pin button will fix it's position.
+
+Close the settings window after adding your preferred columns.
+
+Note: You can rearrange columns in the grid by dragging them into your preferred order.  You can also apply column or grid filters.  See the respective videos for more information.
+
+app-grid provides the ability to group records.  Open the settings panel.  Click on the 'Row Groups' menu item.  Click the 'Group' button on the lead source field.
+
+Click on the 'Sort' menu item.  Check the 'Group by lead source' column and check the 'Full Name' column.  
+
+There are many more view settings that can be created such as calculated column, styled cell, grid filters, etc.  These settings are discussed in depth in their respective videos.
+
+When you close the settings dialog, the view will be created or updated.
+
+If there are multiple views defined for given object, you can select the desired view in the grid toolbar view selector.
+
+Whenever a change is made to the view, the view will be updated with that change.  For example, if you apply a column filter or a sort, the view definition will include the filtering and sorting preferences.  
+
+app-grid provides a rich set of features that user's can leverage to customize their views to best suit their workflows.  We recommend watching the other view settings videos to discover all the ways users can personalize their views.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@appGridSoftware.com or visit our website.  Thank you for watching.

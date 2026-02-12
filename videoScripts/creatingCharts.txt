@@ -1,0 +1,17 @@
+In this video, we will review how each user can configure app-grid to display their list view chart preferences.  
+
+app-grid is a native lightning web component application that delivers powerful query, filtering, presentation and personalization features that delight users and increase productivity. 
+
+One popular feature of App-Grid is the ability to display charts.  App-Grid charts are dynamically created from the current query data so no reports or data cubes are required!  Charts are always defined with respect to the current selected object.
+
+When displaying a list view,  to create a chart right-click on the view and select the Chart menu option along with the type of chart to be created.  Let's select the Column chart type.
+
+The chart is displayed above the grid.  The chart was created with default settings so the chart must be configured to match our business requirements.  Click on the chart settings button in the chart toolbar.  Aside from the chart type, the most important chart settings are the categories and series.
+
+Click on the Data tab.  Expand the categories panel.  The chart selected Type as the default category.  For this chart, we want the category to be Ownership.  Open the series tab.  By default, the Annual Revenue field was selected when the chart was created.  In this case, that's ok, but we want to also add the Estimated Revenue field.  Click the Add Series button.  The dropdown will display all fields that can be used as a series type.  Select the Estimated Revenue field.
+
+The last step in creating a chart is to format it to our requirements.  Click on the Format tab.  There are many ways to format a chart.  Let's add a title by checking the 'enable charts' property, and entering 'Estimated vs Actual Revenue' for the Text property.  Let's pick yellow for the title color and increase the title font size.  Explore the other chart settings.  The property names are self explanatory.
+
+Once we have our chart defined, the next step is to save it.  Click on the Save Chart button in the chart toolbar.  Enter a name for the chart and click save.  The chart will now show up as a option in the chart dropdown selector in the grid toolbar.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@app-grid-software.com or visit our website.  Thank you for watching.

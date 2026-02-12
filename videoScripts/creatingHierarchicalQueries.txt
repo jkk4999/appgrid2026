@@ -1,0 +1,55 @@
+In this video, we will demonstrate the ability of the app-grid query builder to create complex hierarchical business queries.
+
+app-grid is a native lightning web component application that delivers powerful query, filtering, presentation and personalization features that delight users and increase productivity.  
+
+The app-grid query builder enables users to easily create complex hierarchical queries using a graphical user interface.   What this means is that a given query rule can contain other query rules.  There is no limit to the level of query rule nesting, but in practical terms, 1 or 2 levels is sufficient to define most business queries.
+
+In the current view, we are displaying the 'My accounts' query that displays all Accounts owned by me.  Let's assume whe have a business process that targets a very specific set of Accounts.  We want to execute a business process flow against these accounts so it's important that the query returns only those records that match our rules.
+
+Click the search button in the grid menu to open the query builder.  The query builder displays the selected query definition.
+
+We already have a query condition defined for the Owner Id field.  To create a new query clause, click the plus button and select 'Add condition'.  Whenever we have more than 1 query clause, we can select the logical operator which defines how the query clauses will be evaluated.  For our purposes, the 'AND' operator is what we want.
+
+Depending on the type of the field selected, the values displayed for the operator options field and the editor for the value field will vary based on what's appropriate for the selected field data type.
+
+In the first dropdown selector, select the 'Industry' field', select the 'In' operator and select 'Chemicals' for the value. One nice feature of the query builder is that you can select multiple values for a picklist field type.  Let's also add the 'Energy' and 'Technology' industries to our value.  
+
+Now let's add a nested query rule.  Click the plus button and select 'Add group'.  Notice that the query rule is indented, which is a visual clue that you are defining a nested query rule.  Select 'Ownership' for the field, 'Not Equal' for the operator and 'Public' for the value.
+
+Click the plus button and select 'Add condition'.  Select 'Annual Revenue' for the field, 'Greater than or equal' for the operator and 5 million for the value.  Notice that the logical operator is set to 'And' which is the default and what we want for this rule because we want both conditions to be true.
+
+Now we are going to add another nested query rule.  Click the plus button and select 'Add group'.  Enter 'Account Type' for the field, 'Equal' for the operator and 'Customer Direct' for the value. Notice that this rule is indented again.
+
+Click the plus button on this nested query rule and select 'Add condition'.  Select 'Employees' for the field, 'Greater than or equal' for the operator and enter 1,000 for the value.  Let's change the logical operator to 'Or' for this rule, because we wan the query to return true if either of these conditions are met.
+
+Let's create a new query by clicking the 'Save as' button.  Enter 'Account promotions' for the value and click 'Submit'.
+
+Run the query by selecting 'Account promotions' in the query selector.
+
+Let's review the results of this query and see if it returned what we expected.
+
+Click on the query builder button in the grid menu to open the query builder. 
+
+Evaluating this query is not simple because we have entered a complex busines rule, but let's dive in to see if our results match our rules.
+
+We know from the 2nd query condition that the Industry must be either 'Chemicals', 'Energy' or 'Technology'.  Close the query builder and sort the Industry column by clicking on the column header.  Yes, the returned records satisfy this condition.
+
+Open the query builder again.  Notice that the top level query operator is 'AND'.  That means the results of the nested query rule will be evaluated agains the top level query rule clauses using 'AND'.
+
+Our nested query rule also has the 'AND' operator, which means that the first 2 nested query rule clauses and the last nested query rule will be logically evaluated using 'AND'.
+
+Our nested query rule says that the Ownership field must not be equal to 'Public' and the 'Annual Revenue' field must be greater than or equal to 5 million.
+
+Close the query builder and let's see if we find this result.
+
+Yes, all of the returned Accounts do not have an Ownership value of 'Public' and all records have Annual Revenue greater then 5 million.
+
+Let's open the query builder again and review our final query rule.  All returned records should have an Account Type equal to 'Customer Direct' or the 'Employees' value greater than or equal to 1,000.
+
+Close the query builder.  Yes, the final nested query rule is also satisfied.
+
+Note, we could also add a sub query to this rule if desired.  See our other video 'Creating query rules with sub queries' for more information.
+
+Hierarchical queries are a powerful feature of app-grid, as it enables users to return the exact records needed to support a business process and eliminate the need to scroll though records not of interest.
+
+If you would like to get more information or arrange for a personalized demo, please don't hesitate to reach out.  Contact us via email at info@appgridsoftware.com or visit our website.  Thank you for watching.

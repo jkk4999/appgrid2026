@@ -1,0 +1,18 @@
+./getLogs.sh 2 ./my_log
+
+// Claude code
+to paste screenshot into claude code, use Contro + v or drag the file into the chat window holding the shift key
+https://www.arsturn.com/blog/claude-code-paste-image-guide
+
+// show debug messages
+useStore.getState().setShowDebugStatements(true)
+
+git add .
+git commit -m "some description"
+git push origin main
+
+<!-- Load Roboto font from Google Fonts -->
+   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  
+   <!-- Load IBMPlexSans font from Google Fonts -->
+   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;700&display=swap" rel="stylesheet" />
