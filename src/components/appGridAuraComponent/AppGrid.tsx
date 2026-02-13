@@ -1397,7 +1397,9 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
    const rowSelection = useMemo<
       RowSelectionOptions | 'single' | 'multiple'
-   >(() => createDefaultRowSelection(), []);
+   >(() => createDefaultRowSelection({
+      checkboxLocation: 'selectionColumn',
+   }), []);
 
    /*==========================================
    ** DERIVED STATE / MEMOIZED VALUES
