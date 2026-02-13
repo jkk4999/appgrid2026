@@ -1429,6 +1429,32 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     }
   }, [gridApi, onParentFieldsChange, saveAgGridState, setSelectedView, selectedView, onClose]);
 
+  // Close handler for Columns tab: snapshot + persist before closing
+  const handleDialogClose = useCallback(async () => {
+    try {
+      if (currentTab === 0) {
+        if (gridApi && setSelectedView && selectedView) {
+          const gridState = (gridApi as any).getState?.() ?? {};
+          const colState = gridApi.getColumnState?.() ?? [];
+          const updatedView = {
+            ...selectedView,
+            gridState: JSON.stringify(gridState),
+            columnState: JSON.stringify(colState),
+          } as SObjectView;
+          setSelectedView(updatedView);
+        }
+
+        if (saveAgGridState) {
+          await saveAgGridState();
+        }
+      }
+    } catch (error) {
+      console.error('[AgColumnManager] Error while closing Column Manager:', error);
+    } finally {
+      onClose();
+    }
+  }, [currentTab, gridApi, onClose, saveAgGridState, selectedView, setSelectedView]);
+
   /*==========================================
   ** VIEW SHARING HANDLERS
   ==========================================*/
@@ -1480,7 +1506,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={() => { void handleDialogClose(); }}
       // maxWidth="sm"
       fullWidth
       container={typeof window !== 'undefined' ? document.body : undefined}
@@ -1523,7 +1549,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
           )}
           {/* Close Button */}
           <IconButton
-            onClick={onClose}
+            onClick={() => { void handleDialogClose(); }}
             sx={{
               position: 'absolute',
               right: 8,
