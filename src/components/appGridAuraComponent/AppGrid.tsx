@@ -4396,12 +4396,10 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                display: 'grid',
                gridTemplateRows: 'auto 1fr', // toolbar on top, content below
                gridTemplateColumns: isPropertyPanelVisible ? `1fr ${propertyPanelWidth}px` : '1fr', // toggle panel
-               width: '100%',
-               height: '100%',
-               minWidth: 0,
-               minHeight: 0,
+               width: `${size.width}px`,
+               height: `${size.height}px`,
                boxSizing: 'border-box',
-               overflow: 'hidden',
+               overflow: 'auto',
                position: 'relative',
                backgroundColor: theme.palette.background.paper,
                color: theme.palette.text.primary,
@@ -4426,14 +4424,14 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                   gridColumn: 1,
                   minWidth: 0,
                   minHeight: 0,
-                  overflow: 'hidden',
+                  overflow: 'auto',
                   display: 'flex',
                   flexDirection: 'column'
                }}
             >
                {loading && <LoadingIndicator isLoading={loading} />}
 
-               <Box sx={{ width: '100%', height: '100%', minHeight: 0, display: 'flex' }}>
+               <Box sx={{ width: '100%', height: '100%', display: 'flex' }}>
                   <Box sx={{ flex: 1, minWidth: 0, minHeight: 0 }}>
                      <AgGridReact
                         ref={gridRef}

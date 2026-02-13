@@ -76,6 +76,8 @@ import LoadingIndicator from '../loadingIndicator/LoadingIndicator';
 import { LMS_ACTIONS, LmsResponse } from '../../lms/lmsActions';
 import { TOPICS } from '../../events/topics';
 
+const HOST_SIZE_TYPE = 'appgrid:host-size';
+
 interface Size {
    width: number;
    height: number;
@@ -135,6 +137,7 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
    const [dayjsLocale, setDayjsLocale] = useState<string>('en');
 
    const [size, setSize] = useState<Size>({ width: 0, height: 0 });
+   const [hostSize, setHostSize] = useState<Size | null>(null);
 
    const { appLocale, dayjsLocaleCode } = useAppLocale();
 
@@ -151,9 +154,21 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
 
       const handler = (event: MessageEvent) => {
          const data = event.data;
-         if (!data || data.type !== 'appgrid:initial-data') return;
-         console.log('[AppWrapper] Received prefetched initialData from LWC host');
-         setFetchedInitialData(data.data);
+         if (!data) return;
+
+         if (data.type === 'appgrid:initial-data') {
+            console.log('[AppWrapper] Received prefetched initialData from LWC host');
+            setFetchedInitialData(data.data);
+            return;
+         }
+
+         if (data.type === HOST_SIZE_TYPE && data.data) {
+            const width = Number(data.data.width);
+            const height = Number(data.data.height);
+            if (width > 1 && height > 1) {
+               setHostSize({ width, height });
+            }
+         }
       };
 
       window.addEventListener('message', handler);
@@ -236,16 +251,17 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
       };
    }, []);
 
-   const isSizeReady = size.width > 1 && size.height > 1;
+   const effectiveSize = hostSize ?? size;
+   const isSizeReady = effectiveSize.width > 1 && effectiveSize.height > 1;
 
    // Debug log only when size actually becomes ready (not on every size change)
    const sizeReadyLoggedRef = useRef(false);
    useEffect(() => {
       if (isSizeReady && !sizeReadyLoggedRef.current) {
          sizeReadyLoggedRef.current = true;
-         // prettyPrint('[AppWrapper] Container ready with size', size, 'green');
+         // prettyPrint('[AppWrapper] Container ready with size', effectiveSize, 'green');
       }
-   }, [isSizeReady, size]);
+   }, [isSizeReady, effectiveSize]);
 
    // ✅ Load Day.js locale dynamically with fallback (based on appLocale)
    useEffect(() => {
@@ -1204,9 +1220,6 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
          style={{
             width: '100%',
             height: '100%',
-            minHeight: 0,
-            minWidth: 0,
-            flex: '1 1 auto',
             position: 'relative',
             overflow: 'hidden',
             display: 'flex',
@@ -1223,7 +1236,7 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
                      <ErrorBoundary>
                         {/* Only mount the app once we have a real size to avoid double init. */}
                         {isSizeReady ? (
-                           <AppViewRouter size={size} apiClient={apiClient} initialData={initialData} />
+                           <AppViewRouter size={effectiveSize} apiClient={apiClient} initialData={initialData} />
                         ) : (
                            <LoadingIndicator isLoading />
                         )}
