@@ -1518,6 +1518,29 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       (event: ColumnMovedEvent) => {
          if (!event.finished) return;
 
+         const apiAny = event.api as any;
+         const columnApi = apiAny?.getColumnApi?.() || apiAny;
+         const selectionColId = 'ag-Grid-SelectionColumn';
+         const editColId = 'editAction';
+         const displayed = apiAny?.getAllDisplayedColumns?.()?.map((c: any) => c.getColId()) || [];
+         const selIdx = displayed.indexOf(selectionColId);
+         const editIdx = displayed.indexOf(editColId);
+
+         if (selIdx >= 0 && editIdx >= 0) {
+            // Keep control columns deterministic: selection first, edit second.
+            columnApi.applyColumnState?.({
+               state: [
+                  { colId: selectionColId, pinned: 'left' },
+                  { colId: editColId, pinned: 'left' },
+               ],
+               applyOrder: false,
+            });
+            if (!(selIdx === 0 && editIdx === 1)) {
+               apiAny.moveColumns?.([selectionColId, editColId], 0);
+               columnApi.moveColumns?.([selectionColId, editColId], 0);
+            }
+         }
+
          handleGridStateChange();
       },
       [handleGridStateChange]
@@ -1528,6 +1551,28 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       requestAnimationFrame(() => {
          setTimeout(() => {
             if ((params.api as any).isDestroyed?.()) return;
+            const apiAny = params.api as any;
+            const columnApi = apiAny?.getColumnApi?.() || apiAny;
+            const selectionColId = 'ag-Grid-SelectionColumn';
+            const editColId = 'editAction';
+            const displayed = apiAny?.getAllDisplayedColumns?.()?.map((c: any) => c.getColId()) || [];
+            const selIdx = displayed.indexOf(selectionColId);
+            const editIdx = displayed.indexOf(editColId);
+
+            if (selIdx >= 0 && editIdx >= 0) {
+               columnApi.applyColumnState?.({
+                  state: [
+                     { colId: selectionColId, pinned: 'left' },
+                     { colId: editColId, pinned: 'left' },
+                  ],
+                  applyOrder: false,
+               });
+               if (!(selIdx === 0 && editIdx === 1)) {
+                  apiAny.moveColumns?.([selectionColId, editColId], 0);
+                  columnApi.moveColumns?.([selectionColId, editColId], 0);
+               }
+            }
+
             const allColumnIds = params.api.getColumns()?.map(col => col.getColId()) || [];
             if (allColumnIds.length > 0) {
                params.api.autoSizeColumns(allColumnIds, false);
