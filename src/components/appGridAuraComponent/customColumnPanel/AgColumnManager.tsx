@@ -92,6 +92,14 @@ import type { GridPermission } from '../../../appInterfaces/grid/gridInterfaces'
 ==========================================*/
 
 type Item = { id: string; label: string };
+type ManagerLists = {
+  available: Item[];
+  pinnedCols: Item[];
+  rowGroups: Item[];
+  values: Item[];
+  pivots: Item[];
+  pivotMode: boolean;
+};
 
 export interface AgColumnManagerProps {
   open: boolean;
@@ -644,41 +652,50 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   }, [ActionCellRenderer, baseLabelCol]);
 
   // Apply lists to main grid
-  const applyToMainGrid = useCallback(() => {
+  const applyToMainGrid = useCallback((next?: Partial<ManagerLists>) => {
     if (!gridApi) {
       return;
     }
 
+    const effectiveAvailable = next?.available ?? available;
+    const effectivePinnedCols = next?.pinnedCols ?? pinnedCols;
+    const effectiveRowGroups = next?.rowGroups ?? rowGroups;
+    const effectiveValues = next?.values ?? values;
+    const effectivePivots = next?.pivots ?? pivots;
+    const effectivePivotMode = next?.pivotMode ?? pivotMode;
+
     const ca: any = (gridApi as any).getColumnApi?.() || (gridApi as any);
 
-    gridApi.setRowGroupColumns?.(rowGroups.map((x) => x.id));
+    gridApi.setRowGroupColumns?.(effectiveRowGroups.map((x) => x.id));
 
-    const pivotIds = pivots.map((x) => x.id);
+    const pivotIds = effectivePivots.map((x) => x.id);
 
     if (typeof setPivot === 'function') {
-      setPivot(pivotMode || pivotIds.length > 0, pivotIds);
+      setPivot(effectivePivotMode || pivotIds.length > 0, pivotIds);
     } else {
-      ca.setPivotMode?.(pivotMode || pivotIds.length > 0);
+      ca.setPivotMode?.(effectivePivotMode || pivotIds.length > 0);
       (gridApi as any).setPivotColumns?.(pivotIds);
     }
 
     // Clear value columns if no row groups are defined (aggregations require grouping)
-    if (rowGroups.length === 0 && values.length > 0) {
-      setValues([]);
+    if (effectiveRowGroups.length === 0 && effectiveValues.length > 0) {
+      if (!next?.values) {
+        setValues([]);
+      }
       gridApi.applyColumnState?.({ defaultState: { aggFunc: undefined }, applyOrder: false });
 
       return;
     }
 
     // Values: apply via applyColumnState to set aggFunc if needed later
-    const vIds = values.map((x) => x.id);
+    const vIds = effectiveValues.map((x) => x.id);
 
     const state = vIds.map((colId) => ({ colId, aggFunc: 'sum' }));
 
     gridApi.applyColumnState?.({ state, defaultState: { aggFunc: undefined }, applyOrder: false });
 
-    if (!pivotMode) {
-      const destIds = available.map((x) => x.id);
+    if (!effectivePivotMode) {
+      const destIds = effectiveAvailable.map((x) => x.id);
 
       const allDisplayed = ca.getAllGridColumns?.() || [];
 
@@ -699,7 +716,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
 
       // Position value/aggregation columns after the auto-generated group column
       // Only when: row groups exist AND value columns exist AND not in pivot mode
-      if (rowGroups.length > 0 && vIds.length > 0) {
+      if (effectiveRowGroups.length > 0 && vIds.length > 0) {
         setTimeout(() => {
           const allCols = ca.getAllGridColumns?.() || [];
           const colIdList = allCols.map((c: any) => c.getColId?.() || c.colId);
@@ -720,10 +737,10 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     }
 
     // Apply pinning: pin columns in the pinned list, unpin columns removed from pinned list
-    const pinnedIds = pinnedCols.map((x) => x.id);
+    const pinnedIds = effectivePinnedCols.map((x) => x.id);
     const pinnedState = pinnedIds.map((colId) => ({ colId, pinned: 'left' as const }));
     // Unpin columns that are in Available (not pinned) — only if they were previously pinned
-    const unpinState = available
+    const unpinState = effectiveAvailable
       .filter((x) => !pinnedIds.includes(x.id))
       .map((x) => ({ colId: x.id, pinned: null as any }));
     if (pinnedState.length || unpinState.length) {
@@ -790,74 +807,6 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
 
     type ListName = keyof typeof all;
 
-    const removeFrom = (listName: ListName, ids: string[]) => {
-      const remove = (arr: Item[]) => arr.filter((x) => !ids.includes(x.id));
-
-      if (listName === 'available') {
-        setAvailable((a) => remove(a));
-      }
-
-      if (listName === 'pinned') {
-        // Never remove editAction from pinned
-        setPinnedCols((a) => a.filter((x) => x.id === 'editAction' || !ids.includes(x.id)));
-      }
-
-      if (listName === 'groups') {
-        setRowGroups((a) => remove(a));
-      }
-
-      if (listName === 'values') {
-        setValues((a) => remove(a));
-      }
-
-      if (listName === 'pivots') {
-        setPivots((a) => remove(a));
-      }
-    };
-
-    const addTo = (listName: ListName, items: Item[], index?: number) => {
-      const add = (arr: Item[]) => {
-        // Filter out items already in the list
-        const newItems = items.filter((item) => !arr.some((x) => x.id === item.id));
-        if (!newItems.length) return arr;
-        if (typeof index === 'number' && index >= 0 && index <= arr.length) {
-          const next = arr.slice();
-          next.splice(index, 0, ...newItems);
-          return next;
-        }
-        return [...arr, ...newItems];
-      };
-
-      if (listName === 'available') {
-        setAvailable(add);
-      }
-
-      if (listName === 'pinned') {
-        setPinnedCols((arr) => {
-          const result = add(arr);
-          // Ensure editAction stays first
-          const eaIdx = result.findIndex((x) => x.id === 'editAction');
-          if (eaIdx > 0) {
-            const [ea] = result.splice(eaIdx, 1);
-            result.unshift(ea);
-          }
-          return result;
-        });
-      }
-
-      if (listName === 'groups') {
-        setRowGroups(add);
-      }
-
-      if (listName === 'values') {
-        setValues(add);
-      }
-
-      if (listName === 'pivots') {
-        setPivots(add);
-      }
-    };
-
     const makeDropZone = (name: ListName) => {
       const dest = all[name];
 
@@ -901,32 +850,82 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
                 items.unshift(ea);
               }
               setPinnedCols(items);
+              applyToMainGrid({ pinnedCols: items });
             } else if (name === 'available') {
               setAvailable(items);
+              applyToMainGrid({ available: items });
             } else if (name === 'groups') {
               setRowGroups(items);
+              applyToMainGrid({ rowGroups: items });
             } else if (name === 'values') {
               setValues(items);
+              applyToMainGrid({ values: items });
             } else if (name === 'pivots') {
               setPivots(items);
+              applyToMainGrid({ pivots: items });
             }
-
-            // Apply to main grid
-            applyToMainGrid();
             return;
           }
 
           // Get the drop index - use overIndex if valid, otherwise append to end
           const overIndex: number = typeof e.overIndex === 'number' && e.overIndex >= 0 ? e.overIndex : -1;
+          const originName = (origin || 'available') as ListName;
 
-          removeFrom(origin || 'available', movedIds);
+          const nextAvailable = [...available];
+          const nextPinned = [...pinnedCols];
+          const nextGroups = [...rowGroups];
+          const nextValues = [...values];
+          const nextPivots = [...pivots];
 
+          const listMap: Record<ListName, Item[]> = {
+            available: nextAvailable,
+            pinned: nextPinned,
+            groups: nextGroups,
+            values: nextValues,
+            pivots: nextPivots,
+          };
+
+          const originList = listMap[originName];
+          if (originName === 'pinned') {
+            listMap[originName] = originList.filter((x) => x.id === 'editAction' || !movedIds.includes(x.id));
+          } else {
+            listMap[originName] = originList.filter((x) => !movedIds.includes(x.id));
+          }
+
+          const targetList = listMap[name].slice();
           const itemsToAdd = movedIds.map((id) => ({ id, label: idToLabel.get(id) || id }));
+          const dedupToAdd = itemsToAdd.filter((item) => !targetList.some((x) => x.id === item.id));
+          if (dedupToAdd.length > 0) {
+            if (overIndex >= 0 && overIndex <= targetList.length) {
+              targetList.splice(overIndex, 0, ...dedupToAdd);
+            } else {
+              targetList.push(...dedupToAdd);
+            }
+          }
 
-          // Insert at the index where the drop occurred, or append if overIndex is invalid (e.g., empty list)
-          addTo(name, itemsToAdd, overIndex >= 0 ? overIndex : undefined);
+          if (name === 'pinned') {
+            const eaIdx = targetList.findIndex((x) => x.id === 'editAction');
+            if (eaIdx > 0) {
+              const [ea] = targetList.splice(eaIdx, 1);
+              targetList.unshift(ea);
+            }
+          }
 
-          applyToMainGrid();
+          listMap[name] = targetList;
+
+          setAvailable(listMap.available);
+          setPinnedCols(listMap.pinned);
+          setRowGroups(listMap.groups);
+          setValues(listMap.values);
+          setPivots(listMap.pivots);
+
+          applyToMainGrid({
+            available: listMap.available,
+            pinnedCols: listMap.pinned,
+            rowGroups: listMap.groups,
+            values: listMap.values,
+            pivots: listMap.pivots,
+          });
         }
       });
       return params;
@@ -960,7 +959,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
 
       lastZonesRef.current.set(api, added);
     });
-  }, [applyToMainGrid, idToLabel]);
+  }, [applyToMainGrid, idToLabel, available, pinnedCols, rowGroups, values, pivots]);
 
   const onGridReadyList = useCallback((which: 'available' | 'pinned' | 'groups' | 'values' | 'pivots') => (e: GridReadyEvent) => {
     if (which === 'available') {
@@ -1047,56 +1046,63 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
         items.unshift(ea);
       }
       setPinnedCols(items);
+      applyToMainGrid({ pinnedCols: items });
     }
 
     if (which === 'available') {
       setAvailable(items);
+      applyToMainGrid({ available: items });
     }
 
     if (which === 'groups') {
       setRowGroups(items);
+      applyToMainGrid({ rowGroups: items });
     }
 
     if (which === 'values') {
       setValues(items);
+      applyToMainGrid({ values: items });
     }
 
     if (which === 'pivots') {
       setPivots(items);
+      applyToMainGrid({ pivots: items });
     }
-
-    applyToMainGrid();
   };
 
   // Remove item from a target list and return to Available
   const removeItemFrom = useCallback((which: 'pinned' | 'groups' | 'values' | 'pivots', id: string) => {
-    const addBack = (id: string) => setAvailable((arr) => {
-      if (arr.some((x) => x.id === id)) {
+    const addBack = (arr: Item[], itemId: string): Item[] => {
+      if (arr.some((x) => x.id === itemId)) {
         return arr;
       }
-
-      const item = { id, label: idToLabel.get(id) || id };
-
+      const item = { id: itemId, label: idToLabel.get(itemId) || itemId };
       return [item, ...arr];
-    });
+    };
 
     if (which === 'pinned') {
       // Never remove editAction
       if (id === 'editAction') return;
-      setPinnedCols((arr) => arr.filter((x) => x.id !== id));
-      addBack(id);
-      applyToMainGrid();
+      const nextPinned = pinnedCols.filter((x) => x.id !== id);
+      const nextAvailable = addBack(available, id);
+      setPinnedCols(nextPinned);
+      setAvailable(nextAvailable);
+      applyToMainGrid({ pinnedCols: nextPinned, available: nextAvailable });
     }
 
     if (which === 'groups') {
-      setRowGroups((arr) => arr.filter((x) => x.id !== id));
-      addBack(id);
-      applyToMainGrid();
+      const nextGroups = rowGroups.filter((x) => x.id !== id);
+      const nextAvailable = addBack(available, id);
+      setRowGroups(nextGroups);
+      setAvailable(nextAvailable);
+      applyToMainGrid({ rowGroups: nextGroups, available: nextAvailable });
     }
 
     if (which === 'values') {
-      setValues((arr) => arr.filter((x) => x.id !== id));
-      addBack(id);
+      const nextValues = values.filter((x) => x.id !== id);
+      const nextAvailable = addBack(available, id);
+      setValues(nextValues);
+      setAvailable(nextAvailable);
       // For values, we need to clear the aggFunc directly on the grid
       // instead of calling applyToMainGrid which would re-apply aggFunc from stale state
       if (gridApi) {
@@ -1112,11 +1118,13 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     }
 
     if (which === 'pivots') {
-      setPivots((arr) => arr.filter((x) => x.id !== id));
-      addBack(id);
-      applyToMainGrid();
+      const nextPivots = pivots.filter((x) => x.id !== id);
+      const nextAvailable = addBack(available, id);
+      setPivots(nextPivots);
+      setAvailable(nextAvailable);
+      applyToMainGrid({ pivots: nextPivots, available: nextAvailable });
     }
-  }, [applyToMainGrid, gridApi, idToLabel]);
+  }, [applyToMainGrid, gridApi, idToLabel, pinnedCols, available, rowGroups, values, pivots]);
 
   // Recalculate grid layouts when dialog opens or pivot section visibility changes
   useEffect(() => {
@@ -1642,23 +1650,30 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
                   <Stack direction="row" alignItems="center" justifyContent="flex-end">
                     <FormControlLabel control={<Switch checked={pivotMode} onChange={(_, c) => {
                       const currentPivotIds = pivots.map((x) => x.id);
+                      const nextPivotMode = c;
                       setPivotMode(c);
-                      if (!c) {
-                        setPivots([]);
-                        setAvailable((arr) => {
-                          const map = new Map(arr.map((x) => [x.id, x] as const));
-                          currentPivotIds.forEach((id) => { if (!map.has(id)) map.set(id, { id, label: idToLabel.get(id) || id }); });
+                      if (!nextPivotMode) {
+                        const nextPivots: Item[] = [];
+                        const nextAvailable = (() => {
+                          const map = new Map(available.map((x) => [x.id, x] as const));
+                          currentPivotIds.forEach((id) => {
+                            if (!map.has(id)) map.set(id, { id, label: idToLabel.get(id) || id });
+                          });
                           return Array.from(map.values());
+                        })();
+                        setPivots(nextPivots);
+                        setAvailable(nextAvailable);
+                        applyToMainGrid({
+                          pivotMode: false,
+                          pivots: nextPivots,
+                          available: nextAvailable,
                         });
-                        if (typeof setPivot === 'function') setPivot(false, []);
-                        else (gridApi as any)?.getColumnApi?.()?.setPivotMode?.(false);
-                        // Note: Do NOT call applyToMainGrid() here — it would run with a
-                        // stale closure (pivotMode still true, pivots still populated) and
-                        // re-enable pivot mode, undoing the disable above.
                       } else {
-                        const ids = currentPivotIds;
-                        if (typeof setPivot === 'function') setPivot(true, ids);
-                        else (gridApi as any)?.getColumnApi?.()?.setPivotMode?.(true);
+                        applyToMainGrid({
+                          pivotMode: true,
+                          pivots,
+                          available,
+                        });
                       }
                     }} />} label="Pivot Mode" />
                   </Stack>

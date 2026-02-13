@@ -1482,6 +1482,10 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                v.id === id ? { ...v, ...payload, Id: id, id } as SObjectView : v
             );
             setViewOptions(updatedViews);
+            const updatedSelectedView = updatedViews.find((v) => v.id === id);
+            if (updatedSelectedView) {
+               setSelectedView(updatedSelectedView as any);
+            }
          }
 
          // Increment share version if this view is shared with others
