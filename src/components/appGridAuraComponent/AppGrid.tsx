@@ -989,6 +989,11 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
    const selectedViewRecordId = useRef('');
 
+   useEffect(() => {
+      const id = (selectedView as any)?.id || (selectedView as any)?.Id || '';
+      selectedViewRecordId.current = id;
+   }, [selectedView]);
+
    const isPropertyPanelVisible =
       showCalculatedColumnPanel ||
       showColumnStylePanel ||
@@ -1423,7 +1428,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       resume: resumeSaves,
    } = useGridStatePersistence({
       getGridApi: () => gridApiRef.current,
-      canSaveNow: () => !!(initialDataLoaded && selectedViewProcessed && firstDataRenderedCompleteRef.current && selectedObject?.qualifiedApiName && selectedView?.id && selectedQuery?.id && _.isEqual(selectedObject?.qualifiedApiName, selectedObjMetadata?.apiName)),
+      canSaveNow: () => !!(initialDataLoaded && selectedViewProcessed && firstDataRenderedCompleteRef.current && selectedObject?.qualifiedApiName && ((selectedView as any)?.id || (selectedView as any)?.Id) && selectedQuery?.id && _.isEqual(selectedObject?.qualifiedApiName, selectedObjMetadata?.apiName)),
       setCurrentState: (state) => setCurrentState(state),
       getExtras: () => {
          const { objColumnStyles, objRowStyles, objCalculatedColumns, filterOptions } = useStore.getState();
@@ -1476,22 +1481,34 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          return { success: !!r.isSuccess, id: r.recordId };
       },
       onAfterSuccess: async (id, payload) => {
+         const currentSelectedId = (selectedView as any)?.id || (selectedView as any)?.Id || '';
+
          // Only reload views when a NEW view was created (id changed)
          // This prevents duplicate queries on every state save
-         if (selectedViewRecordId.current !== id) {
+         if (currentSelectedId && currentSelectedId !== id) {
             selectedViewRecordId.current = id;
+            setSelectedViewRecordId(id);
             await reloadViews();
          } else if (id && payload) {
             // For existing views, update the local viewOptions cache with
             // the saved payload so that switching views and back reflects
             // the latest state (e.g. pivotMode toggled off).
-            const updatedViews = (viewOptions || []).map((v: SObjectView) =>
-               v.id === id ? { ...v, ...payload, Id: id, id } as SObjectView : v
-            );
-            setViewOptions(updatedViews);
-            const updatedSelectedView = updatedViews.find((v) => v.id === id);
-            if (updatedSelectedView) {
-               setSelectedView(updatedSelectedView as any);
+            setViewOptions((prev: SObjectView[] | null) => {
+               const list = prev || [];
+               let touched = false;
+               const updated = list.map((v: SObjectView) => {
+                  const viewId = (v as any)?.id || (v as any)?.Id;
+                  if (viewId === id) {
+                     touched = true;
+                     return { ...v, ...payload, Id: id, id } as SObjectView;
+                  }
+                  return v;
+               });
+               return touched ? updated : list;
+            });
+            const selectedId = (selectedView as any)?.id || (selectedView as any)?.Id;
+            if (selectedId === id && selectedView) {
+               setSelectedView({ ...(selectedView as any), ...payload, Id: id, id } as any);
             }
          }
 
@@ -4829,7 +4846,14 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                saveAgGridState={saveAgGridState}
                selectedView={selectedView}
                onParentFieldsChange={handleParentFieldsChange}
-               setSelectedView={setSelectedView}
+               setSelectedView={(v) => {
+                  setSelectedView(v as any);
+                  const id = (v as any)?.id || (v as any)?.Id || '';
+                  if (id) {
+                     selectedViewRecordId.current = id;
+                     setSelectedViewRecordId(id);
+                  }
+               }}
                gridPermission={gridPermissions}
                isSystemAdmin={isSystemAdmin}
                sObjectName={selectedObject?.qualifiedApiName}
