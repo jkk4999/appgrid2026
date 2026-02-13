@@ -348,6 +348,8 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   const [values, setValues] = useState<Item[]>([]);
 
   const [pivots, setPivots] = useState<Item[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [availableFilter, setAvailableFilter] = useState<string>('');
 
@@ -362,6 +364,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   const [selectionSummary, setSelectionSummary] = useState<Record<string, { relationshipName: string; fields: string[] }>>({});
 
   const relationFieldsApi = useRef<GridApi | null>(null);
+  const syncingAvailableSelectionRef = useRef(false);
 
   const savedParentFieldsConfigRef = useRef<Record<string, { relationshipName: string; fields: string[] }>>({});
 
@@ -531,6 +534,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     setAvailable(buildItems(avail, idToLabel));
 
     setPivotMode(isPivot);
+    setIsDirty(false);
 
   }, [allowId, gridApi, idToLabel, isFixed]);
 
@@ -775,6 +779,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     const visible = new Set<string>((colState || []).filter((s) => s && s.colId && s.hide !== true).map((s) => String(s.colId)));
 
     // Update selection in Available list based on visibility
+    syncingAvailableSelectionRef.current = true;
     avail.deselectAll?.();
 
     avail.forEachNode?.((n: any) => {
@@ -782,6 +787,9 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       const shouldSelect = !!id && visible.has(String(id));
       n.setSelected?.(shouldSelect);
     });
+    setTimeout(() => {
+      syncingAvailableSelectionRef.current = false;
+    }, 0);
   }, [gridApi]);
 
   // After opening and after list refresh, mirror selection from grid
@@ -850,19 +858,19 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
                 items.unshift(ea);
               }
               setPinnedCols(items);
-              applyToMainGrid({ pinnedCols: items });
+              setIsDirty(true);
             } else if (name === 'available') {
               setAvailable(items);
-              applyToMainGrid({ available: items });
+              setIsDirty(true);
             } else if (name === 'groups') {
               setRowGroups(items);
-              applyToMainGrid({ rowGroups: items });
+              setIsDirty(true);
             } else if (name === 'values') {
               setValues(items);
-              applyToMainGrid({ values: items });
+              setIsDirty(true);
             } else if (name === 'pivots') {
               setPivots(items);
-              applyToMainGrid({ pivots: items });
+              setIsDirty(true);
             }
             return;
           }
@@ -918,14 +926,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
           setRowGroups(listMap.groups);
           setValues(listMap.values);
           setPivots(listMap.pivots);
-
-          applyToMainGrid({
-            available: listMap.available,
-            pinnedCols: listMap.pinned,
-            rowGroups: listMap.groups,
-            values: listMap.values,
-            pivots: listMap.pivots,
-          });
+          setIsDirty(true);
         }
       });
       return params;
@@ -995,40 +996,10 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       return;
     }
 
-    const ca: any = (gridApi as any).getColumnApi?.() || (gridApi as any);
-
-    const selectedIds: string[] = [];
-
-    const allIds: string[] = [];
-
-    availableApi.current.forEachNode?.((n: any) => {
-      const id = n?.data?.id;
-
-      if (!id) {
-        return;
-      }
-
-      allIds.push(String(id));
-      if (n.isSelected?.()) {
-        selectedIds.push(String(id));
-      }
-    });
-
-    // Compare with current visibility to avoid redundant updates
-    const colState: any[] = gridApi.getColumnState?.() || [];
-
-    const currentVisible = new Set<string>((colState || []).filter((s) => s && s.colId && s.hide !== true).map((s) => String(s.colId)));
-
-    const equal = allIds.every((id) => currentVisible.has(id) === selectedIds.includes(id));
-
-    if (equal) {
+    if (syncingAvailableSelectionRef.current) {
       return;
     }
-
-    // Build column state updates: visible if selected, hidden if not
-    const state = allIds.map((colId) => ({ colId, hide: !selectedIds.includes(colId) }));
-
-    ca.applyColumnState?.({ state, applyOrder: false });
+    setIsDirty(true);
   }, [gridApi]);
 
   const reorderWithin = (which: 'available' | 'pinned' | 'groups' | 'values' | 'pivots') => (e: RowDragEndEvent) => {
@@ -1046,27 +1017,27 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
         items.unshift(ea);
       }
       setPinnedCols(items);
-      applyToMainGrid({ pinnedCols: items });
+      setIsDirty(true);
     }
 
     if (which === 'available') {
       setAvailable(items);
-      applyToMainGrid({ available: items });
+      setIsDirty(true);
     }
 
     if (which === 'groups') {
       setRowGroups(items);
-      applyToMainGrid({ rowGroups: items });
+      setIsDirty(true);
     }
 
     if (which === 'values') {
       setValues(items);
-      applyToMainGrid({ values: items });
+      setIsDirty(true);
     }
 
     if (which === 'pivots') {
       setPivots(items);
-      applyToMainGrid({ pivots: items });
+      setIsDirty(true);
     }
   };
 
@@ -1087,7 +1058,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       const nextAvailable = addBack(available, id);
       setPinnedCols(nextPinned);
       setAvailable(nextAvailable);
-      applyToMainGrid({ pinnedCols: nextPinned, available: nextAvailable });
+      setIsDirty(true);
     }
 
     if (which === 'groups') {
@@ -1095,7 +1066,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       const nextAvailable = addBack(available, id);
       setRowGroups(nextGroups);
       setAvailable(nextAvailable);
-      applyToMainGrid({ rowGroups: nextGroups, available: nextAvailable });
+      setIsDirty(true);
     }
 
     if (which === 'values') {
@@ -1103,18 +1074,8 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       const nextAvailable = addBack(available, id);
       setValues(nextValues);
       setAvailable(nextAvailable);
-      // For values, we need to clear the aggFunc directly on the grid
-      // instead of calling applyToMainGrid which would re-apply aggFunc from stale state
-      if (gridApi) {
-        // Clear aggFunc for this column - use null to remove aggregation
-        gridApi.applyColumnState?.({
-          state: [{ colId: id, aggFunc: null }],
-          applyOrder: false
-        });
-        // Refresh to recalculate aggregations
-        gridApi.refreshClientSideRowModel?.('aggregate');
-      }
-      return; // Don't call applyToMainGrid - we handled it directly
+      setIsDirty(true);
+      return;
     }
 
     if (which === 'pivots') {
@@ -1122,9 +1083,9 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       const nextAvailable = addBack(available, id);
       setPivots(nextPivots);
       setAvailable(nextAvailable);
-      applyToMainGrid({ pivots: nextPivots, available: nextAvailable });
+      setIsDirty(true);
     }
-  }, [applyToMainGrid, gridApi, idToLabel, pinnedCols, available, rowGroups, values, pivots]);
+  }, [idToLabel, pinnedCols, available, rowGroups, values, pivots]);
 
   // Recalculate grid layouts when dialog opens or pivot section visibility changes
   useEffect(() => {
@@ -1429,23 +1390,69 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     }
   }, [gridApi, onParentFieldsChange, saveAgGridState, setSelectedView, selectedView, onClose]);
 
-  // Close handler for Columns tab: snapshot + persist before closing
+  const handleSaveColumns = useCallback(async () => {
+    if (!gridApi) {
+      return;
+    }
+    try {
+      setIsSaving(true);
+
+      applyToMainGrid({
+        available,
+        pinnedCols,
+        rowGroups,
+        values,
+        pivots,
+        pivotMode,
+      });
+
+      // Apply available checkbox visibility in one pass.
+      const availApi = availableApi.current;
+      if (availApi) {
+        const selectedIds = new Set<string>();
+        const allIds: string[] = [];
+        availApi.forEachNode?.((n: any) => {
+          const id = n?.data?.id;
+          if (!id) return;
+          const sid = String(id);
+          allIds.push(sid);
+          if (n.isSelected?.()) selectedIds.add(sid);
+        });
+        if (allIds.length) {
+          const ca: any = (gridApi as any).getColumnApi?.() || (gridApi as any);
+          const state = allIds.map((colId) => ({ colId, hide: !selectedIds.has(colId) }));
+          ca.applyColumnState?.({ state, applyOrder: false });
+        }
+      }
+
+      if (setSelectedView && selectedView) {
+        const updatedView = {
+          ...selectedView,
+          gridState: JSON.stringify((gridApi as any).getState?.() ?? {}),
+          columnState: JSON.stringify(gridApi.getColumnState?.() ?? []),
+        } as SObjectView;
+        setSelectedView(updatedView);
+      }
+
+      if (saveAgGridState) {
+        await saveAgGridState();
+      }
+
+      setIsDirty(false);
+    } catch (error) {
+      console.error('[AgColumnManager] Error saving column changes:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [applyToMainGrid, available, gridApi, pinnedCols, pivotMode, pivots, rowGroups, saveAgGridState, selectedView, setSelectedView, values]);
+
+  // Close handler for Columns tab: explicit save model (prompt discard if dirty)
   const handleDialogClose = useCallback(async () => {
     try {
-      if (currentTab === 0) {
-        if (gridApi && setSelectedView && selectedView) {
-          const gridState = (gridApi as any).getState?.() ?? {};
-          const colState = gridApi.getColumnState?.() ?? [];
-          const updatedView = {
-            ...selectedView,
-            gridState: JSON.stringify(gridState),
-            columnState: JSON.stringify(colState),
-          } as SObjectView;
-          setSelectedView(updatedView);
-        }
-
-        if (saveAgGridState) {
-          await saveAgGridState();
+      if (currentTab === 0 && isDirty) {
+        const discard = window.confirm('You have unsaved column changes. Discard them?');
+        if (!discard) {
+          return;
         }
       }
     } catch (error) {
@@ -1453,7 +1460,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
     } finally {
       onClose();
     }
-  }, [currentTab, gridApi, onClose, saveAgGridState, selectedView, setSelectedView]);
+  }, [currentTab, isDirty, onClose]);
 
   /*==========================================
   ** VIEW SHARING HANDLERS
@@ -1462,13 +1469,15 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   // Handle Share button click - save grid state first to ensure row groups/pivot columns are captured
   const handleShareClick = useCallback(async () => {
     if (selectedView?.id && selectedView?.name) {
-      // Save grid state first to ensure the latest row groups, pivot columns, etc. are persisted
-      if (saveAgGridState) {
+      if (currentTab === 0 && isDirty) {
+        await handleSaveColumns();
+      } else if (saveAgGridState) {
+        // Ensure latest persisted state before sharing.
         await saveAgGridState();
       }
       openShareViewDialog(selectedView.id, selectedView.name);
     }
-  }, [selectedView, openShareViewDialog, saveAgGridState]);
+  }, [currentTab, handleSaveColumns, isDirty, selectedView, openShareViewDialog, saveAgGridState]);
 
   // Handle Import View from SharedWithMeTab
   const handleImportView = useCallback((sharedView: SharedViewDTO) => {
@@ -1530,6 +1539,23 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 6 }}>
         Column Manager
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {currentTab === 0 && (
+            <Tooltip title="Save column changes">
+              <span>
+                <Button
+                  variant="contained"
+                  size='small'
+                  onClick={() => { void handleSaveColumns(); }}
+                  disabled={!isDirty || isSaving}
+                  sx={{
+                    backgroundColor: selectedAccentColor,
+                    color: 'white',
+                  }}>
+                  Save
+                </Button>
+              </span>
+            </Tooltip>
+          )}
           {/* Share View Button - only shown when team sharing is enabled and a view is selected */}
           {isTeamSharingEnabled && selectedView?.id && (
             <Tooltip title="Share this view with other users">
@@ -1689,17 +1715,9 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
                         })();
                         setPivots(nextPivots);
                         setAvailable(nextAvailable);
-                        applyToMainGrid({
-                          pivotMode: false,
-                          pivots: nextPivots,
-                          available: nextAvailable,
-                        });
+                        setIsDirty(true);
                       } else {
-                        applyToMainGrid({
-                          pivotMode: true,
-                          pivots,
-                          available,
-                        });
+                        setIsDirty(true);
                       }
                     }} />} label="Pivot Mode" />
                   </Stack>
