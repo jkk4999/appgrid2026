@@ -490,7 +490,7 @@ export function createAgGridColumns({
                 suppressColumnsToolPanel: true,
                 chartDataType: 'excluded',
                 pinned: 'left',
-                lockPosition: 'left',
+                lockPinned: true,
                 cellRenderer: (params: ICellRendererParams) => {
                     const recordId = params.data?.Id;
                     if (!recordId) return null;

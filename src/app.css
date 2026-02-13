@@ -168,6 +168,11 @@
   color: #ffffff !important;
 }
 
+/* Keep grouped row labels left-aligned in the auto-group column. */
+.ag-cell.appgrid-group-cell-left .ag-cell-wrapper {
+  justify-content: flex-start;
+}
+
 /*
  * ===================================================================
  * Dark Mode Fix for AG-Grid Integrated Charts

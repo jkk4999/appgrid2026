@@ -1306,6 +1306,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       headerName: '',
       width: 280,
       pinned: 'left',
+      cellClass: 'appgrid-group-cell-left',
       suppressMovable: true,
       suppressHeaderMenuButton: true,
       suppressColumnsToolPanel: true,
@@ -1342,6 +1343,10 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    // NOTE: popupParent is commented out to match the test component
    const gridOptions: GridOptions = {
       autoGroupColumnDef: autoGroupColumnDef,
+      selectionColumnDef: {
+         pinned: 'left',
+         lockPosition: 'left',
+      },
       defaultColDef: { flex: 1 },
       cellSelection: true,
       enableCharts: true,
@@ -2082,6 +2087,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                field: resolvedGroupField,
                width: 300,
                pinned: 'left',
+               cellClass: 'appgrid-group-cell-left',
                suppressMovable: true,
                suppressHeaderMenuButton: true,
                suppressColumnsToolPanel: true,
@@ -2133,6 +2139,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             headerName: '',
             width: 280,
             pinned: 'left',
+            cellClass: 'appgrid-group-cell-left',
             suppressMovable: true,
             suppressHeaderMenuButton: true,
             suppressColumnsToolPanel: true,
