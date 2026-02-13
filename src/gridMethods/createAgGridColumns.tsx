@@ -499,8 +499,10 @@ export function createAgGridColumns({
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
+                                justifyContent: 'flex-end',
                                 height: '100%',
+                                width: '100%',
+                                paddingRight: '4px',
                             }}
                         >
                             <Tooltip title="Edit" arrow>
