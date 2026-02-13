@@ -477,6 +477,8 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     headerName: 'Hierarchy',
     field: (relationTreeGridPreferences as any)?.groupField,
     width: 300,
+    pinned: 'left',
+    cellClass: 'appgrid-group-cell-left',
     cellRendererParams: { suppressCount: true },
   }), [relationTreeGridPreferences]);
 
@@ -496,7 +498,9 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     );
   }, [nameFieldMap, objectsWithoutNameFieldMap, parentObjectApiName]);
 
-  const rowSelection = useMemo(() => createDefaultRowSelection(), []);  // Row selection setup (checkboxes + select-all support)
+  const rowSelection = useMemo(() => createDefaultRowSelection({
+    checkboxLocation: 'selectionColumn',
+  }), []);  // Row selection setup (checkboxes + select-all support)
 
   // Default autoGroupColumnDef for non-tree grid modes (row grouping)
   // Tree grid mode sets its own autoGroupColumnDef dynamically with the field property
@@ -505,6 +509,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     headerName: '',
     width: 280,
     pinned: 'left',
+    cellClass: 'appgrid-group-cell-left',
     suppressMovable: true,
     suppressHeaderMenuButton: true,
     suppressColumnsToolPanel: true,
@@ -532,6 +537,10 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
   // NOTE: popupParent is commented out to match the test component
   const gridOptions: GridOptions = {
     autoGroupColumnDef: autoGroupColumnDef,
+    selectionColumnDef: {
+      pinned: 'left',
+      lockPosition: 'left',
+    },
     cellSelection: true,
     enableCharts: false,
     getMainMenuItems: (params) => {
@@ -735,16 +744,42 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     action,
   });
 
+  const enforceControlColumnsOrder = useCallback((api: any) => {
+    const apiAny = api as any;
+    if (!apiAny || apiAny.isDestroyed?.()) return;
+    const columnApi = apiAny.getColumnApi?.() || apiAny;
+    const selectionColId = 'ag-Grid-SelectionColumn';
+    const editColId = 'editAction';
+    const displayed = apiAny.getAllDisplayedColumns?.()?.map((c: any) => c.getColId()) || [];
+    const selIdx = displayed.indexOf(selectionColId);
+    const editIdx = displayed.indexOf(editColId);
+
+    if (selIdx >= 0 && editIdx >= 0) {
+      columnApi.applyColumnState?.({
+        state: [
+          { colId: selectionColId, pinned: 'left' },
+          { colId: editColId, pinned: 'left' },
+        ],
+        applyOrder: false,
+      });
+      if (!(selIdx === 0 && editIdx === 1)) {
+        apiAny.moveColumns?.([selectionColId, editColId], 0);
+        columnApi.moveColumns?.([selectionColId, editColId], 0);
+      }
+    }
+  }, []);
+
   const onColumnMoved = useCallback(
     (event: ColumnMovedEvent) => {
       if (!event.finished) {
         return;
       }
+      enforceControlColumnsOrder(event.api);
       // Column moving is user-initiated, enable saves
       userHasInteractedRef.current = true;
       handleGridStateChange();
     },
-    [handleGridStateChange]
+    [enforceControlColumnsOrder, handleGridStateChange]
   );
 
   const onFirstDataRendered = useCallback((params: FirstDataRenderedEvent) => {
@@ -752,6 +787,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     requestAnimationFrame(() => {
       setTimeout(() => {
         if ((params.api as any).isDestroyed?.()) return;
+        enforceControlColumnsOrder(params.api);
         const allColumnIds = params.api.getColumns()?.map(col => col.getColId()) || [];
 
         if (allColumnIds.length > 0) {
@@ -759,7 +795,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
         }
       }, 50);
     });
-  }, []);
+  }, [enforceControlColumnsOrder]);
 
   // Fetch subgrid TreeGrid preferences for this relation (only on first switch into Tree Grid view per object)
   const fetchTreeGridPrefs = useCallback(async (force = false) => {
@@ -1296,6 +1332,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
         const gridState = JSON.parse(view.gridState!)
 
         api.applyColumnState({ state: columnState as any, applyOrder: true });
+        enforceControlColumnsOrder(api);
 
         // Auto-size columns after applying view state
         requestAnimationFrame(() => {
@@ -1343,7 +1380,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     }
 
     loadView(view);
-  }, [action, enqueueSnackbar, gridApiRef, resumeSaves, saveLastViewUsed, suspendSaves]);
+  }, [action, enforceControlColumnsOrder, enqueueSnackbar, gridApiRef, resumeSaves, saveLastViewUsed, suspendSaves]);
 
   // ✅ Unified view loading effect - waits for gridApi to be ready before fetching views.  If no views exist, creates a default view immediately (since gridApi is available)
   useEffect(() => {
@@ -1736,7 +1773,14 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
 
         api.setGridOption('treeDataParentIdField', parentField);
 
-        api.setGridOption('autoGroupColumnDef', { headerName: 'Hierarchy', field: resolvedGroupField, width: 300, cellRendererParams: { suppressCount: true } });
+        api.setGridOption('autoGroupColumnDef', {
+          headerName: 'Hierarchy',
+          field: resolvedGroupField,
+          width: 300,
+          pinned: 'left',
+          cellClass: 'appgrid-group-cell-left',
+          cellRendererParams: { suppressCount: true },
+        });
 
         api.setGridOption('treeData', true);
       }
@@ -1749,6 +1793,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
         headerName: '',
         width: 280,
         pinned: 'left',
+        cellClass: 'appgrid-group-cell-left',
         suppressMovable: true,
         suppressHeaderMenuButton: true,
         suppressColumnsToolPanel: true,

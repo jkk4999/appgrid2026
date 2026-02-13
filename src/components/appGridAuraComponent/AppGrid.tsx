@@ -1513,37 +1513,42 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    ** CALLBACKS
    ==========================================*/
 
+   const enforceControlColumnsOrder = useCallback((api: any) => {
+      const apiAny = api as any;
+      if (!apiAny || apiAny.isDestroyed?.()) return;
+      const columnApi = apiAny.getColumnApi?.() || apiAny;
+      const selectionColId = 'ag-Grid-SelectionColumn';
+      const editColId = 'editAction';
+      const displayed = apiAny.getAllDisplayedColumns?.()?.map((c: any) => c.getColId()) || [];
+      const selIdx = displayed.indexOf(selectionColId);
+      const editIdx = displayed.indexOf(editColId);
+
+      if (selIdx >= 0 && editIdx >= 0) {
+         // Keep control columns deterministic: selection first, edit second.
+         columnApi.applyColumnState?.({
+            state: [
+               { colId: selectionColId, pinned: 'left' },
+               { colId: editColId, pinned: 'left' },
+            ],
+            applyOrder: false,
+         });
+         if (!(selIdx === 0 && editIdx === 1)) {
+            apiAny.moveColumns?.([selectionColId, editColId], 0);
+            columnApi.moveColumns?.([selectionColId, editColId], 0);
+         }
+      }
+   }, []);
+
 
    const onColumnMoved = useCallback(
       (event: ColumnMovedEvent) => {
          if (!event.finished) return;
 
-         const apiAny = event.api as any;
-         const columnApi = apiAny?.getColumnApi?.() || apiAny;
-         const selectionColId = 'ag-Grid-SelectionColumn';
-         const editColId = 'editAction';
-         const displayed = apiAny?.getAllDisplayedColumns?.()?.map((c: any) => c.getColId()) || [];
-         const selIdx = displayed.indexOf(selectionColId);
-         const editIdx = displayed.indexOf(editColId);
-
-         if (selIdx >= 0 && editIdx >= 0) {
-            // Keep control columns deterministic: selection first, edit second.
-            columnApi.applyColumnState?.({
-               state: [
-                  { colId: selectionColId, pinned: 'left' },
-                  { colId: editColId, pinned: 'left' },
-               ],
-               applyOrder: false,
-            });
-            if (!(selIdx === 0 && editIdx === 1)) {
-               apiAny.moveColumns?.([selectionColId, editColId], 0);
-               columnApi.moveColumns?.([selectionColId, editColId], 0);
-            }
-         }
+         enforceControlColumnsOrder(event.api);
 
          handleGridStateChange();
       },
-      [handleGridStateChange]
+      [enforceControlColumnsOrder, handleGridStateChange]
    );
 
    const onFirstDataRendered = useCallback((params: FirstDataRenderedEvent) => {
@@ -1551,27 +1556,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       requestAnimationFrame(() => {
          setTimeout(() => {
             if ((params.api as any).isDestroyed?.()) return;
-            const apiAny = params.api as any;
-            const columnApi = apiAny?.getColumnApi?.() || apiAny;
-            const selectionColId = 'ag-Grid-SelectionColumn';
-            const editColId = 'editAction';
-            const displayed = apiAny?.getAllDisplayedColumns?.()?.map((c: any) => c.getColId()) || [];
-            const selIdx = displayed.indexOf(selectionColId);
-            const editIdx = displayed.indexOf(editColId);
-
-            if (selIdx >= 0 && editIdx >= 0) {
-               columnApi.applyColumnState?.({
-                  state: [
-                     { colId: selectionColId, pinned: 'left' },
-                     { colId: editColId, pinned: 'left' },
-                  ],
-                  applyOrder: false,
-               });
-               if (!(selIdx === 0 && editIdx === 1)) {
-                  apiAny.moveColumns?.([selectionColId, editColId], 0);
-                  columnApi.moveColumns?.([selectionColId, editColId], 0);
-               }
-            }
+            enforceControlColumnsOrder(params.api);
 
             const allColumnIds = params.api.getColumns()?.map(col => col.getColId()) || [];
             if (allColumnIds.length > 0) {
@@ -1584,7 +1569,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             }, 200);
          }, 50);
       });
-   }, []);
+   }, [enforceControlColumnsOrder]);
 
    // Note: Auto-sizing columns on every rowData change was removed to improve performance.
    // The onFirstDataRendered callback handles initial auto-sizing.
@@ -1920,6 +1905,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          const cleaned = newState.filter((s: any) => s && s.colId);
 
          columnApi.applyColumnState({ state: cleaned, applyOrder: true });
+         enforceControlColumnsOrder(apiAny);
 
          apiAny.refreshHeader?.();
 
@@ -1932,7 +1918,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             }
          );
       }
-   }, [action, enqueueSnackbar, gridApi, gridApiRef]);
+   }, [action, enforceControlColumnsOrder, enqueueSnackbar, gridApi, gridApiRef]);
 
    // Global fallback: if Aura swallows panel pointerup, run commit on window pointer/mouse up when popup is open
    useEffect(() => {
@@ -2161,6 +2147,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                if (parsed && typeof parsed === 'object') {
                   if (parsed.columnState && Array.isArray(parsed.columnState)) {
                      gridApi.applyColumnState({ state: parsed.columnState, applyOrder: true });
+                     enforceControlColumnsOrder(gridApi);
                   }
 
                   if (parsed.filterModel) {
@@ -2212,7 +2199,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          setTreeDataActive(false);
       }
 
-   }, [gridApi, isTreeGrid, treeGridPreferences, groupDisplayType, selectedObjMetadata, setShowAdvancedFilter, setTreeGridPreferences, theme.palette.text.primary]);
+   }, [enforceControlColumnsOrder, gridApi, isTreeGrid, treeGridPreferences, groupDisplayType, selectedObjMetadata, setShowAdvancedFilter, setTreeGridPreferences, theme.palette.text.primary]);
 
    // Fetch TreeGrid preferences when switching to Tree Grid view
    useEffect(() => {
