@@ -144,17 +144,25 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
    // ✅ Memoized API client
    const apiClient = useMemo(() => new SfdcClient(), []);
 
-   // ✅ Fetch initialData via bridge when not provided as prop (iframe/Cloudflare mode)
+   // ✅ In iframe/Cloudflare mode: listen for prefetched initialData pushed from LWC host,
+   //    then signal ready so the LWC knows to send it
    useEffect(() => {
-      if (initialDataProp) return; // already provided by LWC host
-      let cancelled = false;
-      apiClient.getInitialData().then((data: InitialDataResponse) => {
-         if (!cancelled) setFetchedInitialData(data);
-      }).catch((err: unknown) => {
-         console.error('[AppWrapper] Failed to fetch initialData via bridge:', err);
-      });
-      return () => { cancelled = true; };
-   }, [apiClient, initialDataProp]);
+      if (initialDataProp) return; // already provided by LWC host as prop
+
+      const handler = (event: MessageEvent) => {
+         const data = event.data;
+         if (!data || data.type !== 'appgrid:initial-data') return;
+         console.log('[AppWrapper] Received prefetched initialData from LWC host');
+         setFetchedInitialData(data.data);
+      };
+
+      window.addEventListener('message', handler);
+
+      // Signal to LWC parent that we're ready to receive initialData
+      window.parent.postMessage({ type: 'appgrid:ready' }, '*');
+
+      return () => window.removeEventListener('message', handler);
+   }, [initialDataProp]);
 
    // DEBUG: Commented out slackGetConfigStatus to test if it's causing slow load times
    // useEffect(() => {
