@@ -1204,6 +1204,9 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
          style={{
             width: '100%',
             height: '100%',
+            minHeight: 0,
+            minWidth: 0,
+            flex: '1 1 auto',
             position: 'relative',
             overflow: 'hidden',
             display: 'flex',
