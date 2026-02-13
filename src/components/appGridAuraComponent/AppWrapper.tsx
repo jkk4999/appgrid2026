@@ -3,6 +3,7 @@ import React, {
    useMemo,
    useState,
    useImperativeHandle,
+   useCallback,
    forwardRef,
    useEffect,
    useRef
@@ -243,46 +244,71 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
       loadLocale();
    }, [dayjsLocaleCode]);
 
+   // ✅ LMS action handler — shared by imperative ref and postMessage listener
+   const handleLmsAction = useCallback(async (action: string, payload?: Record<string, unknown>): Promise<LmsResponse> => {
+      const actionToTopic: Record<string, string> = {
+         'getCapabilities': TOPICS.LMS_GET_CAPABILITIES,
+         'selectObject': TOPICS.LMS_SELECT_OBJECT,
+         'selectView': TOPICS.LMS_SELECT_VIEW,
+         'selectQuery': TOPICS.LMS_SELECT_QUERY,
+         'executeQuery': TOPICS.LMS_EXECUTE_QUERY,
+         'getViews': TOPICS.LMS_GET_VIEWS,
+         'getQueries': TOPICS.LMS_GET_QUERIES,
+         'getOrgObjects': TOPICS.LMS_GET_ORG_OBJECTS,
+         'getFilters': TOPICS.LMS_GET_FILTERS,
+         'setAdvancedFilter': TOPICS.LMS_SET_ADVANCED_FILTER,
+         'clearFilters': TOPICS.LMS_CLEAR_FILTERS,
+         'getColumnStyles': TOPICS.LMS_GET_COLUMN_STYLES,
+         'setColumnStyle': TOPICS.LMS_SET_COLUMN_STYLE,
+         'clearColumnStyles': TOPICS.LMS_CLEAR_COLUMN_STYLES,
+         'getRowStyles': TOPICS.LMS_GET_ROW_STYLES,
+         'setRowStyle': TOPICS.LMS_SET_ROW_STYLE,
+         'clearRowStyles': TOPICS.LMS_CLEAR_ROW_STYLES,
+      };
+
+      const topic = actionToTopic[action];
+      if (!topic) {
+         return { success: false, error: `Unknown action: ${action}` };
+      }
+
+      return new Promise((resolve) => {
+         PubSub.publish(topic, { payload, resolve });
+      });
+   }, []);
+
    // ✅ Expose API client and LMS handler via ref
-   // All LMS actions use PubSub for consistent architecture
    useImperativeHandle(ref, () => {
       return {
          apiClient,
-         handleLmsAction: async (action: string, payload?: Record<string, unknown>): Promise<LmsResponse> => {
+         handleLmsAction
+      };
+   }, [apiClient, handleLmsAction]);
 
-            // Map action names to LMS topics
-            const actionToTopic: Record<string, string> = {
-               'getCapabilities': TOPICS.LMS_GET_CAPABILITIES,
-               'selectObject': TOPICS.LMS_SELECT_OBJECT,
-               'selectView': TOPICS.LMS_SELECT_VIEW,
-               'selectQuery': TOPICS.LMS_SELECT_QUERY,
-               'executeQuery': TOPICS.LMS_EXECUTE_QUERY,
-               'getViews': TOPICS.LMS_GET_VIEWS,
-               'getQueries': TOPICS.LMS_GET_QUERIES,
-               'getOrgObjects': TOPICS.LMS_GET_ORG_OBJECTS,
-               'getFilters': TOPICS.LMS_GET_FILTERS,
-               'setAdvancedFilter': TOPICS.LMS_SET_ADVANCED_FILTER,
-               'clearFilters': TOPICS.LMS_CLEAR_FILTERS,
-               'getColumnStyles': TOPICS.LMS_GET_COLUMN_STYLES,
-               'setColumnStyle': TOPICS.LMS_SET_COLUMN_STYLE,
-               'clearColumnStyles': TOPICS.LMS_CLEAR_COLUMN_STYLES,
-               'getRowStyles': TOPICS.LMS_GET_ROW_STYLES,
-               'setRowStyle': TOPICS.LMS_SET_ROW_STYLE,
-               'clearRowStyles': TOPICS.LMS_CLEAR_ROW_STYLES,
-            };
+   // ✅ Listen for LMS actions forwarded from LWC host via postMessage (iframe bridge)
+   useEffect(() => {
+      const handler = async (event: MessageEvent) => {
+         const data = event.data;
+         if (!data || data.type !== 'appgrid:lms:action') return;
 
-            const topic = actionToTopic[action];
-            if (!topic) {
-               return { success: false, error: `Unknown action: ${action}` };
-            }
+         const { lmsRequestId, action, payload } = data;
 
-            // Use Promise-based PubSub pattern for all LMS actions
-            return new Promise((resolve) => {
-               PubSub.publish(topic, { payload, resolve });
-            });
+         try {
+            const result = await handleLmsAction(action, payload);
+            window.parent.postMessage(
+               { type: 'appgrid:lms:response', lmsRequestId, result },
+               '*'
+            );
+         } catch (error) {
+            window.parent.postMessage(
+               { type: 'appgrid:lms:response', lmsRequestId, result: { success: false, error: String(error) } },
+               '*'
+            );
          }
       };
-   }, [apiClient]);
+
+      window.addEventListener('message', handler);
+      return () => window.removeEventListener('message', handler);
+   }, [handleLmsAction]);
 
    // ✅ LMS Action Handlers - all use PubSub for consistency
    // Handler for LMS_GET_CAPABILITIES
