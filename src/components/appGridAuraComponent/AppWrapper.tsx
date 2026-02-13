@@ -110,8 +110,12 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
 
    const setMode = useThemeStore((state) => state.setMode);
 
-   const { initialData } = props;
+   const { initialData: initialDataProp } = props;
 
+   // In iframe/Cloudflare mode, initialData is not passed as a prop — fetch it via the bridge
+   const [fetchedInitialData, setFetchedInitialData] = useState<InitialDataResponse | undefined>(undefined);
+
+   const initialData = initialDataProp ?? fetchedInitialData;
 
    /*---- GLOBAL STATE ----*/
    const {
@@ -139,6 +143,18 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
 
    // ✅ Memoized API client
    const apiClient = useMemo(() => new SfdcClient(), []);
+
+   // ✅ Fetch initialData via bridge when not provided as prop (iframe/Cloudflare mode)
+   useEffect(() => {
+      if (initialDataProp) return; // already provided by LWC host
+      let cancelled = false;
+      apiClient.getInitialData().then((data: InitialDataResponse) => {
+         if (!cancelled) setFetchedInitialData(data);
+      }).catch((err: unknown) => {
+         console.error('[AppWrapper] Failed to fetch initialData via bridge:', err);
+      });
+      return () => { cancelled = true; };
+   }, [apiClient, initialDataProp]);
 
    // DEBUG: Commented out slackGetConfigStatus to test if it's causing slow load times
    // useEffect(() => {

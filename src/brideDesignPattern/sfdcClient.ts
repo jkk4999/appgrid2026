@@ -268,6 +268,10 @@ private async callApex(methodName: string, params?: any): Promise<any> {
   //   }
   // }
 
+  async getInitialData(): Promise<any> {
+    return await this.callApex('getInitialData');
+  }
+
   async cloneAppGridConfig(params: {
     userId: string;
     userIdsToClone: string[];
