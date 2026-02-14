@@ -150,10 +150,10 @@ const CustomTabPanel: React.FC<CustomTabPanelProps> = ({
          hidden={!isActive}
          id={`tabpanel-${index}`}
          aria-labelledby={`tab-${index}`}
-         style={{ width: '100%', minWidth: 0, overflowX: 'hidden' }}
+         style={{ width: '100%', minWidth: 0, overflowX: 'hidden', height: '100%', minHeight: 0 }}
       >
          {(keepMounted || isActive) && (
-            <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden' }}>
+            <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden', height: '100%', minHeight: 0 }}>
                {children}
             </Box>
          )}
@@ -1856,20 +1856,18 @@ const QueryBuilder = (props: any) => {
             fullWidth
             maxWidth="lg"
             sx={{
-               // Let MUI center the dialog (no transforms) and size the paper
-               // width: '85vw',
-               height: '70vh',
-               // top: '50%',
-               // left: '50%',
-               // transform: 'translate(-50%, -50%)',
                '& .MuiDialog-paper': {
                   backgroundColor: theme.palette.background.paper,
                   borderColor: 'silver',
                   borderWidth: 1,
                   color: theme.palette.text.primary,
-                  mt: '400px',
+                  mt: 0,
                   width: 'calc(100vw - 64px)',
                   maxWidth: '1200px',
+                  height: '70vh',
+                  maxHeight: '70vh',
+                  display: 'flex',
+                  flexDirection: 'column',
                   overflowX: 'hidden',
                },
                '& .MuiBackdrop-root': {
@@ -1929,8 +1927,10 @@ const QueryBuilder = (props: any) => {
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
+                  flex: 1,
+                  minHeight: 0,
                   minWidth: 0,
-                  overflowX: 'hidden',
+                  overflow: 'hidden',
                }}>
                <Box
                   sx={{ marginTop: 2, marginBottom: 2 }}>
@@ -1938,7 +1938,7 @@ const QueryBuilder = (props: any) => {
                      isRuleValid={isRuleValid} objPermissionsMap={objPermissionsMap} />
                </Box>
                <TabContext value={value}>
-                  <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden' }}>
+                  <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                   <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                      <TabList
                         onChange={handleChange}
@@ -1992,6 +1992,7 @@ const QueryBuilder = (props: any) => {
                            display: 'flex',
                            marginTop: 2,
                            flexGrow: 1,
+                           minHeight: 0,
                            flexDirection: 'column',
                            justifyContent: 'flex-start',
                            width: '100%',
@@ -2118,6 +2119,7 @@ const QueryBuilder = (props: any) => {
                         sx={{
                            display: 'flex',
                            flexGrow: 1,
+                           minHeight: 0,
                            flexDirection: 'column',
                            justifyContent: 'flex-start',
                            width: '100%',

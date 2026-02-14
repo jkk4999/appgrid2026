@@ -565,7 +565,7 @@ const QbAutocomplete: React.FC<QbAutocompleteProps> = ({
         inputValue={inputValue}
         isOptionEqualToValue={(option, val) => option.id === val?.id}
         onChange={handleChange}
-        sx={{ width: '100%', minWidth: 0 }}
+        sx={{ width: 250 }}
         slotProps={{
           popper: {
             sx: { zIndex: 3000 },

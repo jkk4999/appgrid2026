@@ -192,21 +192,8 @@
 .appgrid-qb-fit .e-rule-container > .e-rule-value,
 .appgrid-qb-fit .e-horizontal-mode > .e-rule-value {
   flex: 2 1 320px !important;
-  min-width: 0 !important;
+  min-width: 220px !important;
   width: auto !important;
-}
-
-.appgrid-qb-fit .e-rule-value > *,
-.appgrid-qb-fit .e-rule-value .MuiFormControl-root,
-.appgrid-qb-fit .e-rule-value .MuiAutocomplete-root,
-.appgrid-qb-fit .e-rule-value .MuiTextField-root,
-.appgrid-qb-fit .e-rule-value .MuiInputBase-root,
-.appgrid-qb-fit .e-rule-value .e-control-wrapper,
-.appgrid-qb-fit .e-rule-value .e-input-group {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  box-sizing: border-box !important;
 }
 
 .appgrid-qb-fit .e-rule-container > .e-rule-delete,

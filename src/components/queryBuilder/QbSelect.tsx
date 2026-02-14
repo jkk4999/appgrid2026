@@ -88,7 +88,7 @@ export default function QbSelect({ options, rule, ruleID, qryBldrRef }: QbSelect
   }
 
   return (
-    <div style={{ width: '100%', minWidth: 0, transform: 'translateY(6px)' }}>
+    <div style={{ width: 250, transform: 'translateY(6px)' }}>
       <Autocomplete
         multiple={isMultiSelectOperator}
         fullWidth

@@ -92,8 +92,7 @@ export default function MuiEmailEditor({ field, rule, ruleID, qryBldrRef }: MuiT
             '& .MuiInputBase-input': {
                color: theme.palette.text.primary
             },
-            width: '100%',
-            minWidth: 0,
+            width: '250px', // Increased by 50px for better visibility
          }}
          error={localErrors.length > 0}
          helperText={localErrors.length > 0 ? localErrors.join(', ') : null}
