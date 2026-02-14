@@ -1853,8 +1853,8 @@ const QueryBuilder = (props: any) => {
    return (
       <>
          <Dialog
-            fullWidth
-            maxWidth="lg"
+            // fullWidth
+            // maxWidth="lg"
             sx={{
                '& .MuiDialog-paper': {
                   backgroundColor: theme.palette.background.paper,
