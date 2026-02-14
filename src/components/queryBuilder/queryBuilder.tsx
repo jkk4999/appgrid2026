@@ -1995,7 +1995,7 @@ const QueryBuilder = (props: any) => {
                               width: '100%',
                               minWidth: 0,
                               overflowY: 'auto',
-                              overflowX: 'hidden',
+                              overflowX: 'auto',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
@@ -2004,9 +2004,9 @@ const QueryBuilder = (props: any) => {
                               flexDirection="row"
                               sx={{
                                  flexFlow: 1,
-                                 width: '100%',
+                                 width: '90%',
                                  minWidth: 0,
-                                 overflowX: 'hidden',
+                                 overflow: 'auto',
                               }}
                            >
                               {/* query delete confirmation dialog */}
