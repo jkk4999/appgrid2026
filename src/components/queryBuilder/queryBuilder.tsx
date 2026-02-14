@@ -1993,10 +1993,12 @@ const QueryBuilder = (props: any) => {
                               minHeight: 0,
                               flexDirection: 'column',
                               justifyContent: 'flex-start',
-                              width: '100%',
+                              width: '95%',
+                              mx: 'auto',
                               minWidth: 0,
-                              overflowY: 'auto',
+                              overflowY: 'scroll',
                               overflowX: 'hidden',
+                              scrollbarGutter: 'stable',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
@@ -2120,10 +2122,12 @@ const QueryBuilder = (props: any) => {
                               minHeight: 0,
                               flexDirection: 'column',
                               justifyContent: 'flex-start',
-                              width: '100%',
+                              width: '95%',
+                              mx: 'auto',
                               minWidth: 0,
-                              overflowY: 'auto',
+                              overflowY: 'scroll',
                               overflowX: 'hidden',
+                              scrollbarGutter: 'stable',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
