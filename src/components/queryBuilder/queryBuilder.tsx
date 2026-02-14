@@ -1862,13 +1862,10 @@ const QueryBuilder = (props: any) => {
                   borderWidth: 1,
                   color: theme.palette.text.primary,
                   mt: 0,
-                  width: 'calc(100vw - 64px)',
-                  maxWidth: '1200px',
+                  width: '60vh',
                   height: '70vh',
-                  maxHeight: '70vh',
                   display: 'flex',
                   flexDirection: 'column',
-                  overflowX: 'hidden',
                },
                '& .MuiBackdrop-root': {
                   backgroundColor: 'transparent',
@@ -1939,296 +1936,296 @@ const QueryBuilder = (props: any) => {
                </Box>
                <TabContext value={value}>
                   <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                     <TabList
-                        onChange={handleChange}
-                        sx={{
-                           display: 'flex',
-                           minWidth: 0,
-                           '& .MuiTab-root': {
-                              flex: 1,
+                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                        <TabList
+                           onChange={handleChange}
+                           sx={{
+                              display: 'flex',
                               minWidth: 0,
-                           },
-                        }} // Ensure the tabs are flex items
-                     >
-                        <Tab
-                           label="Query"
-                           value="1"
-                           sx={{
-                              color: theme.palette.text.primary, // Default color
-                              '&.Mui-selected': {
-                                 color: theme.palette.text.primary, // Color when selected
+                              '& .MuiTab-root': {
+                                 flex: 1,
+                                 minWidth: 0,
                               },
-                           }} />
-                        <Tab
-                           label="SubQuery"
-                           value="2"
-                           sx={{
-                              color: theme.palette.text.primary, // Default color
-                              '&.Mui-selected': {
-                                 color: theme.palette.text.primary, // Color when selected
-                              },
-                           }} />
-                        {isTeamSharingEnabled && (
+                           }} // Ensure the tabs are flex items
+                        >
                            <Tab
-                              label="Shared With Me"
-                              value="3"
+                              label="Query"
+                              value="1"
                               sx={{
                                  color: theme.palette.text.primary, // Default color
                                  '&.Mui-selected': {
                                     color: theme.palette.text.primary, // Color when selected
                                  },
                               }} />
-                        )}
-                     </TabList>
-                  </Box>
-                  <CustomTabPanel
-                     value={value}
-                     index="1"
-                     keepMounted>
-                     <Box
-                        // className='border-zinc-400'
-                        sx={{
-                           display: 'flex',
-                           marginTop: 2,
-                           flexGrow: 1,
-                           minHeight: 0,
-                           flexDirection: 'column',
-                           justifyContent: 'flex-start',
-                           width: '100%',
-                           minWidth: 0,
-                           overflowY: 'auto',
-                           overflowX: 'hidden',
-                           backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
-                        }}
-                     >
-                        {/* QueryBuilderComponent */}
-                        <Stack
-                           flexDirection="row"
+                           <Tab
+                              label="SubQuery"
+                              value="2"
+                              sx={{
+                                 color: theme.palette.text.primary, // Default color
+                                 '&.Mui-selected': {
+                                    color: theme.palette.text.primary, // Color when selected
+                                 },
+                              }} />
+                           {isTeamSharingEnabled && (
+                              <Tab
+                                 label="Shared With Me"
+                                 value="3"
+                                 sx={{
+                                    color: theme.palette.text.primary, // Default color
+                                    '&.Mui-selected': {
+                                       color: theme.palette.text.primary, // Color when selected
+                                    },
+                                 }} />
+                           )}
+                        </TabList>
+                     </Box>
+                     <CustomTabPanel
+                        value={value}
+                        index="1"
+                        keepMounted>
+                        <Box
+                           // className='border-zinc-400'
                            sx={{
-                              flexFlow: 1,
+                              display: 'flex',
+                              marginTop: 2,
+                              flexGrow: 1,
+                              minHeight: 0,
+                              flexDirection: 'column',
+                              justifyContent: 'flex-start',
                               width: '100%',
                               minWidth: 0,
+                              overflowY: 'auto',
                               overflowX: 'hidden',
+                              backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
-                           {/* query delete confirmation dialog */}
-                           {showQueryDeleteDialog && (
-                              <QueryDeleteDialog onConfirm={async () => {
-                                 // Confirmed deletion handled here via useDeleteRecords
-                                 await handleDeleteSelectedQuery();
-                              }} />
-                           )}
-
-
-                           {/* Conditional Rendering for QueryBuilderComponent */}
-                           {selectedObjMetadata && queryBuilderColumns.length > 0 ? (
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                 <QueryBuilderComponent
-                                    id="querybuilder"
-                                    cssClass="appgrid-qb-fit"
-                                    ref={qryBldrRef}
-                                    key={selectedObject?.qualifiedApiName || 'qb-main'}
-                                    columns={queryBuilderColumns}
-                                    displayMode="Horizontal"
-                                    fieldModel={mainFieldModel}
-                                    dataSource={rowData} // Ensure rowData is used as intended or remove
-                                    enableNotCondition={true}
-                                    created={() => {
-                                       setIsQueryBuilderMounted(true); // Signal component is mounted
-                                       // Validate rules now that component is created with columns
-                                       if (qryBldrRef.current) {
-                                          const rule = qryBldrRef.current.getRules() || { condition: 'and', rules: [] };
-                                          updateMainRuleValidity(validateRule(rule));
-                                          setCurrentQueryRule(rule);
-                                       }
-                                    }}
-                                    rule={currentQueryRule}
-                                    ruleChange={onRuleChange}
-                                    change={onRuleChange}
-                                    sortDirection="Ascending"
-                                    showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
-                                    width="100%"
-                                 />
-                              </Box>
-                           ) : (
-                              // Placeholder content while loading or if no columns
-                              <Box
-                                 sx={{
-                                    padding: 2,
-                                    width: '800px'
-                                 }}>
-                                 {showQueryPanel && !selectedObjMetadata && (
-                                    <Typography>Loading object metadata...</Typography>
-                                 )}
-                                 {showQueryPanel && selectedObjMetadata && queryBuilderColumns.length === 0 && (
-                                    <Typography>No queryable fields available for this object, or still loading.</Typography>
-                                 )}
-                              </Box>
-                           )}
-
-                           {/* 2nd column - query text */}
-                           {showQueryText ? (
-                              <Stack
-                                 flexDirection="column"
-                                 sx={{
-
-                                    ml: 5,
-                                 }}
-                              >
-                                 {/* json/sql buttons */}
-                                 <FormControl
-                                 >
-                                    <FormLabel id="query-display-buttons">Query Display Type</FormLabel>
-                                    <RadioGroup
-                                       row
-                                       aria-labelledby="radio-buttons-group-label"
-                                       name="query-display-type-buttons-group"
-                                       onChange={(event) => {
-                                          setQueryDisplayType(event.target.value)
-                                       }}
-                                       value={queryDisplayType}
-                                    >
-                                       <FormControlLabel value="json" control={<Radio />} label="JSON" />
-                                       <FormControlLabel value="sql" control={<Radio />} label="SQL" />
-                                    </RadioGroup>
-                                 </FormControl>
-
-                                 {/* query results */}
-                                 <Box
-                                    sx={{
-                                       color: 'black',
-                                       backgroundColor: 'white',
-                                       width: 300
-                                    }}
-                                 >
-                                    <TextField fullWidth multiline maxRows={8} value={queryRuleText} />
-                                 </Box>
-                              </Stack>
-                           ) : (
-                              null
-                           )}
-                        </Stack>
-
-                     </Box>
-                  </CustomTabPanel>
-                  {/* related QueryBuilder */}
-                  <CustomTabPanel value={value} index="2" keepMounted>
-                     <Box
-                        // className='border-zinc-400'
-                        sx={{
-                           display: 'flex',
-                           flexGrow: 1,
-                           minHeight: 0,
-                           flexDirection: 'column',
-                           justifyContent: 'flex-start',
-                           width: '100%',
-                           minWidth: 0,
-                           overflowY: 'auto',
-                           overflowX: 'hidden',
-                           backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
-                        }}
-                     >
-                        {/* relation selector */}
-                        <Autocomplete
-                           sx={{
-                              input: { color: theme.palette.text.primary },
-                              width: 250,
-                              marginTop: 2,
-                              marginBottom: 2
-                           }}
-
-                           slotProps={{
-                              clearIndicator: {
-                                 style: {
-                                    color: theme.palette.text.primary,
-                                 }
-                              },
-                              popupIndicator: {
-                                 style: {
-                                    color: theme.palette.text.primary,
-                                 }
-                              },
-                           }}
-                           options={relationOptions}
-                           getOptionLabel={(option) => (option ? option.label : '')}
-                           isOptionEqualToValue={(option, value) => option.name === value.name}
-                           value={selectedRelation}
-                           onChange={(_event, value: any) => {
-                              setSelectedRelation(value)
-                           }}
-                           disableClearable
-                           renderInput={(params) => (
-                              <TextField
-                                 {...params}
-                                 label="Select relation"
-                                 margin="normal"
-                                 variant="standard"
-                                 fullWidth
-                                 sx={{
-                                    '& .MuiTextField-root': {
-                                       color: 'white'
-                                    },
-                                    '& .MuiInput-underline:before': {
-                                       borderBottomColor: theme.palette.text.primary, // Set the color of the underline
-                                    },
-                                    '& .MuiInput-underline:hover:before': {
-                                       borderBottomColor: theme.palette.text.primary, // Set the color of the underline on hover
-                                    },
-                                    '& .MuiInput-underline:after': {
-                                       borderBottomColor: theme.palette.text.primary, // Set the color of the underline after interaction
-                                    },
-
-                                 }}
-                              />
-                           )}
-                        />
-                        {subQueryBuilderColumns.length > 0 && relatedQueryRule.rules && (
-                           <QueryBuilderComponent
-                              id="subQueryBuilder"
-                              cssClass="appgrid-qb-fit"
-                              key={JSON.stringify(relatedQueryRule)}
-                              ref={subQryBldrRef}
-                              columns={subQueryBuilderColumns}
-                              displayMode="Horizontal"
-                              fieldModel={subFieldModel}
-                              enableNotCondition={true}
-                              rule={relatedQueryRule}
-                              ruleChange={onRelatedRuleChange}
-                              change={onRelatedRuleChange}
-                              showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
-                              sortDirection="Ascending"
-                              width="100%"
-                           />
-                        )}
-                     </Box>
-                  </CustomTabPanel>
-                  {isTeamSharingEnabled && (
-                     <CustomTabPanel value={value} index="3" keepMounted>
-                        {apiClient && selectedObject?.qualifiedApiName ? (
-                           <SharedQueriesTab
-                              apiClient={apiClient}
-                              sObjectName={selectedObject.qualifiedApiName}
-                              onImportQuery={handleImportQuery}
-                              onUpdateQuery={handleUpdateQuery}
-                           />
-                        ) : (
-                           <Box
+                           {/* QueryBuilderComponent */}
+                           <Stack
+                              flexDirection="row"
                               sx={{
-                                 display: 'flex',
-                                 alignItems: 'center',
-                                 justifyContent: 'center',
-                                 height: '100%',
-                                 minHeight: 240,
+                                 flexFlow: 1,
+                                 width: '100%',
+                                 minWidth: 0,
+                                 overflowX: 'hidden',
                               }}
                            >
-                              <Typography variant="body2" color="text.secondary">
-                                 Select an object to view shared queries.
-                              </Typography>
-                           </Box>
-                        )}
+                              {/* query delete confirmation dialog */}
+                              {showQueryDeleteDialog && (
+                                 <QueryDeleteDialog onConfirm={async () => {
+                                    // Confirmed deletion handled here via useDeleteRecords
+                                    await handleDeleteSelectedQuery();
+                                 }} />
+                              )}
+
+
+                              {/* Conditional Rendering for QueryBuilderComponent */}
+                              {selectedObjMetadata && queryBuilderColumns.length > 0 ? (
+                                 <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <QueryBuilderComponent
+                                       id="querybuilder"
+                                       cssClass="appgrid-qb-fit"
+                                       ref={qryBldrRef}
+                                       key={selectedObject?.qualifiedApiName || 'qb-main'}
+                                       columns={queryBuilderColumns}
+                                       displayMode="Horizontal"
+                                       fieldModel={mainFieldModel}
+                                       dataSource={rowData} // Ensure rowData is used as intended or remove
+                                       enableNotCondition={true}
+                                       created={() => {
+                                          setIsQueryBuilderMounted(true); // Signal component is mounted
+                                          // Validate rules now that component is created with columns
+                                          if (qryBldrRef.current) {
+                                             const rule = qryBldrRef.current.getRules() || { condition: 'and', rules: [] };
+                                             updateMainRuleValidity(validateRule(rule));
+                                             setCurrentQueryRule(rule);
+                                          }
+                                       }}
+                                       rule={currentQueryRule}
+                                       ruleChange={onRuleChange}
+                                       change={onRuleChange}
+                                       sortDirection="Ascending"
+                                       showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
+                                       width="100%"
+                                    />
+                                 </Box>
+                              ) : (
+                                 // Placeholder content while loading or if no columns
+                                 <Box
+                                    sx={{
+                                       padding: 2,
+                                       width: '800px'
+                                    }}>
+                                    {showQueryPanel && !selectedObjMetadata && (
+                                       <Typography>Loading object metadata...</Typography>
+                                    )}
+                                    {showQueryPanel && selectedObjMetadata && queryBuilderColumns.length === 0 && (
+                                       <Typography>No queryable fields available for this object, or still loading.</Typography>
+                                    )}
+                                 </Box>
+                              )}
+
+                              {/* 2nd column - query text */}
+                              {showQueryText ? (
+                                 <Stack
+                                    flexDirection="column"
+                                    sx={{
+
+                                       ml: 5,
+                                    }}
+                                 >
+                                    {/* json/sql buttons */}
+                                    <FormControl
+                                    >
+                                       <FormLabel id="query-display-buttons">Query Display Type</FormLabel>
+                                       <RadioGroup
+                                          row
+                                          aria-labelledby="radio-buttons-group-label"
+                                          name="query-display-type-buttons-group"
+                                          onChange={(event) => {
+                                             setQueryDisplayType(event.target.value)
+                                          }}
+                                          value={queryDisplayType}
+                                       >
+                                          <FormControlLabel value="json" control={<Radio />} label="JSON" />
+                                          <FormControlLabel value="sql" control={<Radio />} label="SQL" />
+                                       </RadioGroup>
+                                    </FormControl>
+
+                                    {/* query results */}
+                                    <Box
+                                       sx={{
+                                          color: 'black',
+                                          backgroundColor: 'white',
+                                          width: 300
+                                       }}
+                                    >
+                                       <TextField fullWidth multiline maxRows={8} value={queryRuleText} />
+                                    </Box>
+                                 </Stack>
+                              ) : (
+                                 null
+                              )}
+                           </Stack>
+
+                        </Box>
                      </CustomTabPanel>
-                  )}
+                     {/* related QueryBuilder */}
+                     <CustomTabPanel value={value} index="2" keepMounted>
+                        <Box
+                           // className='border-zinc-400'
+                           sx={{
+                              display: 'flex',
+                              flexGrow: 1,
+                              minHeight: 0,
+                              flexDirection: 'column',
+                              justifyContent: 'flex-start',
+                              width: '100%',
+                              minWidth: 0,
+                              overflowY: 'auto',
+                              overflowX: 'hidden',
+                              backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
+                           }}
+                        >
+                           {/* relation selector */}
+                           <Autocomplete
+                              sx={{
+                                 input: { color: theme.palette.text.primary },
+                                 width: 250,
+                                 marginTop: 2,
+                                 marginBottom: 2
+                              }}
+
+                              slotProps={{
+                                 clearIndicator: {
+                                    style: {
+                                       color: theme.palette.text.primary,
+                                    }
+                                 },
+                                 popupIndicator: {
+                                    style: {
+                                       color: theme.palette.text.primary,
+                                    }
+                                 },
+                              }}
+                              options={relationOptions}
+                              getOptionLabel={(option) => (option ? option.label : '')}
+                              isOptionEqualToValue={(option, value) => option.name === value.name}
+                              value={selectedRelation}
+                              onChange={(_event, value: any) => {
+                                 setSelectedRelation(value)
+                              }}
+                              disableClearable
+                              renderInput={(params) => (
+                                 <TextField
+                                    {...params}
+                                    label="Select relation"
+                                    margin="normal"
+                                    variant="standard"
+                                    fullWidth
+                                    sx={{
+                                       '& .MuiTextField-root': {
+                                          color: 'white'
+                                       },
+                                       '& .MuiInput-underline:before': {
+                                          borderBottomColor: theme.palette.text.primary, // Set the color of the underline
+                                       },
+                                       '& .MuiInput-underline:hover:before': {
+                                          borderBottomColor: theme.palette.text.primary, // Set the color of the underline on hover
+                                       },
+                                       '& .MuiInput-underline:after': {
+                                          borderBottomColor: theme.palette.text.primary, // Set the color of the underline after interaction
+                                       },
+
+                                    }}
+                                 />
+                              )}
+                           />
+                           {subQueryBuilderColumns.length > 0 && relatedQueryRule.rules && (
+                              <QueryBuilderComponent
+                                 id="subQueryBuilder"
+                                 cssClass="appgrid-qb-fit"
+                                 key={JSON.stringify(relatedQueryRule)}
+                                 ref={subQryBldrRef}
+                                 columns={subQueryBuilderColumns}
+                                 displayMode="Horizontal"
+                                 fieldModel={subFieldModel}
+                                 enableNotCondition={true}
+                                 rule={relatedQueryRule}
+                                 ruleChange={onRelatedRuleChange}
+                                 change={onRelatedRuleChange}
+                                 showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
+                                 sortDirection="Ascending"
+                                 width="100%"
+                              />
+                           )}
+                        </Box>
+                     </CustomTabPanel>
+                     {isTeamSharingEnabled && (
+                        <CustomTabPanel value={value} index="3" keepMounted>
+                           {apiClient && selectedObject?.qualifiedApiName ? (
+                              <SharedQueriesTab
+                                 apiClient={apiClient}
+                                 sObjectName={selectedObject.qualifiedApiName}
+                                 onImportQuery={handleImportQuery}
+                                 onUpdateQuery={handleUpdateQuery}
+                              />
+                           ) : (
+                              <Box
+                                 sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    height: '100%',
+                                    minHeight: 240,
+                                 }}
+                              >
+                                 <Typography variant="body2" color="text.secondary">
+                                    Select an object to view shared queries.
+                                 </Typography>
+                              </Box>
+                           )}
+                        </CustomTabPanel>
+                     )}
                   </Box>
                </TabContext>
                {/* saveAs name */}
