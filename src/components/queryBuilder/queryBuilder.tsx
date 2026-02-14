@@ -150,10 +150,10 @@ const CustomTabPanel: React.FC<CustomTabPanelProps> = ({
          hidden={!isActive}
          id={`tabpanel-${index}`}
          aria-labelledby={`tab-${index}`}
-         style={{ width: '100%', minWidth: 0, overflowX: 'hidden', height: '100%', minHeight: 0 }}
+         style={{ width: '100%', minWidth: 0, overflowX: 'hidden', height: '100%', minHeight: 0, flex: 1 }}
       >
          {(keepMounted || isActive) && (
-            <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden', height: '100%', minHeight: 0 }}>
+            <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', flex: 1 }}>
                {children}
             </Box>
          )}
@@ -1862,10 +1862,11 @@ const QueryBuilder = (props: any) => {
                   borderWidth: 1,
                   color: theme.palette.text.primary,
                   mt: 0,
-                  // width: '60vh',
-                  // height: '70vh',
+                  height: '70vh',
+                  maxHeight: '70vh',
                   display: 'flex',
                   flexDirection: 'column',
+                  overflow: 'hidden',
                },
                '& .MuiBackdrop-root': {
                   backgroundColor: 'transparent',
@@ -1927,7 +1928,7 @@ const QueryBuilder = (props: any) => {
                   flex: 1,
                   minHeight: 0,
                   minWidth: 0,
-                  overflow: 'auto',
+                  overflow: 'hidden',
                }}>
                <Box
                   sx={{ marginTop: 2, marginBottom: 2 }}>
@@ -1935,7 +1936,7 @@ const QueryBuilder = (props: any) => {
                      isRuleValid={isRuleValid} objPermissionsMap={objPermissionsMap} />
                </Box>
                <TabContext value={value}>
-                  <Box sx={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                  <Box sx={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <TabList
                            onChange={handleChange}
@@ -1994,7 +1995,8 @@ const QueryBuilder = (props: any) => {
                               justifyContent: 'flex-start',
                               width: '100%',
                               minWidth: 0,
-                              overflow: 'auto',
+                              overflowY: 'auto',
+                              overflowX: 'hidden',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
@@ -2003,9 +2005,9 @@ const QueryBuilder = (props: any) => {
                               flexDirection="row"
                               sx={{
                                  flexFlow: 1,
-                                 width: '90%',
+                                 width: '100%',
                                  minWidth: 0,
-                                 overflow: 'auto',
+                                 overflow: 'visible',
                               }}
                            >
                               {/* query delete confirmation dialog */}
@@ -2118,9 +2120,10 @@ const QueryBuilder = (props: any) => {
                               minHeight: 0,
                               flexDirection: 'column',
                               justifyContent: 'flex-start',
-                              width: '90%',
+                              width: '100%',
                               minWidth: 0,
-                              overflow: 'auto',
+                              overflowY: 'auto',
+                              overflowX: 'hidden',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
@@ -2193,7 +2196,7 @@ const QueryBuilder = (props: any) => {
                                  change={onRelatedRuleChange}
                                  showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
                                  sortDirection="Ascending"
-                                 width="90%"
+                                 width="100%"
                               />
                            )}
                         </Box>
