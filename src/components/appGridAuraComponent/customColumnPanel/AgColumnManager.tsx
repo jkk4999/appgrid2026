@@ -46,7 +46,7 @@ import useStore from '../../../zustandStore';
 import { useShallow } from 'zustand/react/shallow';
 
 // MUI
-import { Dialog, DialogTitle, DialogContent, Box, Stack, Typography, IconButton, Switch, FormControlLabel, TextField, InputAdornment, Tabs, Tab, MenuItem, Select, FormControl, InputLabel, Button, Chip } from '@mui/material';
+import { Alert, Dialog, DialogTitle, DialogContent, Box, Stack, Typography, IconButton, Switch, FormControlLabel, TextField, InputAdornment, Tabs, Tab, MenuItem, Select, FormControl, InputLabel, Button, Chip } from '@mui/material';
 
 // Theme
 import { useTheme } from '@mui/material/styles';
@@ -350,6 +350,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   const [pivots, setPivots] = useState<Item[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [availableFilter, setAvailableFilter] = useState<string>('');
 
@@ -544,6 +545,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   // Refresh whenever dialog opens or api/columns info change
   useEffect(() => {
     if (open) {
+      setSaveError(null);
       refreshListsFromGrid();
     }
   }, [open, refreshListsFromGrid]);
@@ -1313,6 +1315,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   // Save parent fields
   const handleSaveParentFields = useCallback(async () => {
     try {
+      setSaveError(null);
       const configJson = JSON.stringify(savedParentFieldsConfigRef.current);
       const config = savedParentFieldsConfigRef.current;
 
@@ -1378,7 +1381,12 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       await new Promise(resolve => setTimeout(resolve, 50));
 
       if (saveAgGridState) {
-        await saveAgGridState();
+        const result = await saveAgGridState();
+        if (!(result === 'success' || result === undefined || result === null)) {
+          const msg = typeof result === 'string' ? result : 'Failed to save grid state';
+          setSaveError(`Save failed: ${msg}`);
+          return;
+        }
       }
 
       emitRefreshQuery();
@@ -1387,15 +1395,18 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       onClose();
     } catch (error) {
       console.error('[AgColumnManager] Error saving parent fields:', error);
+      const message = error instanceof Error ? error.message : 'Unexpected error while saving parent fields';
+      setSaveError(`Save failed: ${message}`);
     }
   }, [gridApi, onParentFieldsChange, saveAgGridState, setSelectedView, selectedView, onClose]);
 
-  const handleSaveColumns = useCallback(async () => {
+  const handleSaveColumns = useCallback(async (closeOnSuccess = false): Promise<boolean> => {
     if (!gridApi) {
-      return;
+      return false;
     }
     try {
       setIsSaving(true);
+      setSaveError(null);
 
       applyToMainGrid({
         available,
@@ -1434,17 +1445,32 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
         setSelectedView(updatedView);
       }
 
+      let saveResult: any = 'success';
       if (saveAgGridState) {
-        await saveAgGridState();
+        saveResult = await saveAgGridState();
+      }
+
+      const didSaveSucceed = saveResult === 'success' || saveResult === undefined || saveResult === null;
+      if (!didSaveSucceed) {
+        const msg = typeof saveResult === 'string' ? saveResult : 'Failed to save grid state';
+        setSaveError(`Save failed: ${msg}`);
+        return false;
       }
 
       setIsDirty(false);
+      if (closeOnSuccess) {
+        onClose();
+      }
+      return true;
     } catch (error) {
       console.error('[AgColumnManager] Error saving column changes:', error);
+      const message = error instanceof Error ? error.message : 'Unexpected error while saving';
+      setSaveError(`Save failed: ${message}`);
+      return false;
     } finally {
       setIsSaving(false);
     }
-  }, [applyToMainGrid, available, gridApi, pinnedCols, pivotMode, pivots, rowGroups, saveAgGridState, selectedView, setSelectedView, values]);
+  }, [applyToMainGrid, available, gridApi, onClose, pinnedCols, pivotMode, pivots, rowGroups, saveAgGridState, selectedView, setSelectedView, values]);
 
   // Close handler for Columns tab: explicit save model (prompt discard if dirty)
   const handleDialogClose = useCallback(async () => {
@@ -1470,10 +1496,18 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
   const handleShareClick = useCallback(async () => {
     if (selectedView?.id && selectedView?.name) {
       if (currentTab === 0 && isDirty) {
-        await handleSaveColumns();
+        const ok = await handleSaveColumns(false);
+        if (!ok) {
+          return;
+        }
       } else if (saveAgGridState) {
         // Ensure latest persisted state before sharing.
-        await saveAgGridState();
+        const result = await saveAgGridState();
+        if (!(result === 'success' || result === undefined || result === null)) {
+          const msg = typeof result === 'string' ? result : 'Failed to save grid state';
+          setSaveError(`Save failed: ${msg}`);
+          return;
+        }
       }
       openShareViewDialog(selectedView.id, selectedView.name);
     }
@@ -1545,7 +1579,7 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
                 <Button
                   variant="contained"
                   size='small'
-                  onClick={() => { void handleSaveColumns(); }}
+                  onClick={() => { void handleSaveColumns(true); }}
                   disabled={!isDirty || isSaving}
                   sx={{
                     backgroundColor: selectedAccentColor,
@@ -1587,6 +1621,11 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       </DialogTitle>
 
       <DialogContent dividers>
+        {saveError && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
+        )}
         <Tabs
           value={currentTab}
           onChange={(_, newValue) => setCurrentTab(newValue)}
