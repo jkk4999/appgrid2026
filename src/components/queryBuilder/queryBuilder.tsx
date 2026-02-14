@@ -1936,7 +1936,7 @@ const QueryBuilder = (props: any) => {
                      isRuleValid={isRuleValid} objPermissionsMap={objPermissionsMap} />
                </Box>
                <TabContext value={value}>
-                  <Box sx={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                  <Box sx={{ width: '100%', mr: '20px', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <TabList
                            onChange={handleChange}
@@ -1993,7 +1993,7 @@ const QueryBuilder = (props: any) => {
                               minHeight: 0,
                               flexDirection: 'column',
                               justifyContent: 'flex-start',
-                              width: '95%',
+                              width: '90%',
                               mx: 'auto',
                               minWidth: 0,
                               overflowY: 'scroll',
@@ -2122,7 +2122,7 @@ const QueryBuilder = (props: any) => {
                               minHeight: 0,
                               flexDirection: 'column',
                               justifyContent: 'flex-start',
-                              width: '95%',
+                              width: '90%',
                               mx: 'auto',
                               minWidth: 0,
                               overflowY: 'scroll',
