@@ -2119,10 +2119,10 @@ const QueryBuilder = (props: any) => {
                               minHeight: 0,
                               flexDirection: 'column',
                               justifyContent: 'flex-start',
-                              width: '100%',
+                              width: '90%',
                               minWidth: 0,
                               overflowY: 'auto',
-                              overflowX: 'hidden',
+                              overflowX: 'auto',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
@@ -2195,7 +2195,7 @@ const QueryBuilder = (props: any) => {
                                  change={onRelatedRuleChange}
                                  showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
                                  sortDirection="Ascending"
-                                 width="100%"
+                                 width="90%"
                               />
                            )}
                         </Box>
