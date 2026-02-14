@@ -1853,8 +1853,8 @@ const QueryBuilder = (props: any) => {
    return (
       <>
          <Dialog
-            // fullWidth
-            // maxWidth="lg"
+            fullWidth
+            maxWidth="lg"
             sx={{
                '& .MuiDialog-paper': {
                   backgroundColor: theme.palette.background.paper,
@@ -1862,8 +1862,8 @@ const QueryBuilder = (props: any) => {
                   borderWidth: 1,
                   color: theme.palette.text.primary,
                   mt: 0,
-                  width: '60vh',
-                  height: '70vh',
+                  // width: '60vh',
+                  // height: '70vh',
                   display: 'flex',
                   flexDirection: 'column',
                },
