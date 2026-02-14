@@ -1936,7 +1936,7 @@ const QueryBuilder = (props: any) => {
                      isRuleValid={isRuleValid} objPermissionsMap={objPermissionsMap} />
                </Box>
                <TabContext value={value}>
-                  <Box sx={{ width: '100%', mr: '20px', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                  <Box sx={{ width: '100%', pr: '20px', minWidth: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <TabList
                            onChange={handleChange}
@@ -2207,28 +2207,37 @@ const QueryBuilder = (props: any) => {
                      </CustomTabPanel>
                      {isTeamSharingEnabled && (
                         <CustomTabPanel value={value} index="3" keepMounted>
-                           {apiClient && selectedObject?.qualifiedApiName ? (
-                              <SharedQueriesTab
-                                 apiClient={apiClient}
-                                 sObjectName={selectedObject.qualifiedApiName}
-                                 onImportQuery={handleImportQuery}
-                                 onUpdateQuery={handleUpdateQuery}
-                              />
-                           ) : (
-                              <Box
-                                 sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    height: '100%',
-                                    minHeight: 240,
-                                 }}
-                              >
-                                 <Typography variant="body2" color="text.secondary">
-                                    Select an object to view shared queries.
-                                 </Typography>
-                              </Box>
-                           )}
+                           <Box
+                              sx={{
+                                 width: '90%',
+                                 mx: 'auto',
+                                 minWidth: 0,
+                                 overflowX: 'hidden',
+                              }}
+                           >
+                              {apiClient && selectedObject?.qualifiedApiName ? (
+                                 <SharedQueriesTab
+                                    apiClient={apiClient}
+                                    sObjectName={selectedObject.qualifiedApiName}
+                                    onImportQuery={handleImportQuery}
+                                    onUpdateQuery={handleUpdateQuery}
+                                 />
+                              ) : (
+                                 <Box
+                                    sx={{
+                                       display: 'flex',
+                                       alignItems: 'center',
+                                       justifyContent: 'center',
+                                       height: '100%',
+                                       minHeight: 240,
+                                    }}
+                                 >
+                                    <Typography variant="body2" color="text.secondary">
+                                       Select an object to view shared queries.
+                                    </Typography>
+                                 </Box>
+                              )}
+                           </Box>
                         </CustomTabPanel>
                      )}
                   </Box>
