@@ -134,11 +134,14 @@ export default function QbMuiDateEditor({ field, rule, ruleID, qryBldrRef }: QbM
         style={{
           display: 'flex',
           gap: 12,
-          alignItems: 'baseline'
+          alignItems: 'baseline',
+          width: '100%',
+          minWidth: 0,
         }}>
         <div style={{
-          width: 250,
-          flexShrink: 0,
+          width: '100%',
+          minWidth: 0,
+          flex: 1,
           transform: 'translateY(6px)'
         }}>
           <DatePicker
@@ -167,8 +170,9 @@ export default function QbMuiDateEditor({ field, rule, ruleID, qryBldrRef }: QbM
         </div>
         <div
           style={{
-            width: 195, // Increased by 50px for better visibility
-            flexShrink: 0,
+            width: '100%',
+            minWidth: 0,
+            flex: 1,
             transform: 'translateY(6px)'
           }}>
           <DatePicker
@@ -202,8 +206,9 @@ export default function QbMuiDateEditor({ field, rule, ruleID, qryBldrRef }: QbM
   return (
     <div
       style={{
-        width: 250,
-        flexShrink: 0,
+        width: '100%',
+        minWidth: 0,
+        flex: 1,
         display: 'flex',
         alignItems: 'baseline',
         transform: 'translateY(6px)'

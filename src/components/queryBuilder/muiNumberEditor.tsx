@@ -245,10 +245,10 @@ export default function MuiNumberEditor({ field, rule, ruleID, qryBldrRef }: Mui
       },
    } as const;
 
-   const containerStyle = { width: 250, flexShrink: 0, transform: 'translateY(6px)' };
+   const containerStyle = { width: '100%', minWidth: 0, flex: 1, transform: 'translateY(6px)' } as const;
 
    return (
-      <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', width: '100%', minWidth: 0 }}>
          {isBetweenOperator ? (
             <>
                <div style={containerStyle}>

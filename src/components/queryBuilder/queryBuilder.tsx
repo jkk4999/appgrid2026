@@ -150,9 +150,10 @@ const CustomTabPanel: React.FC<CustomTabPanelProps> = ({
          hidden={!isActive}
          id={`tabpanel-${index}`}
          aria-labelledby={`tab-${index}`}
+         style={{ width: '100%', minWidth: 0, overflowX: 'hidden' }}
       >
          {(keepMounted || isActive) && (
-            <Box sx={{ width: '100%', minWidth: 0 }}>
+            <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden' }}>
                {children}
             </Box>
          )}
@@ -1866,7 +1867,10 @@ const QueryBuilder = (props: any) => {
                   borderColor: 'silver',
                   borderWidth: 1,
                   color: theme.palette.text.primary,
-                  mt: '400px'
+                  mt: '400px',
+                  width: 'calc(100vw - 64px)',
+                  maxWidth: '1200px',
+                  overflowX: 'hidden',
                },
                '& .MuiBackdrop-root': {
                   backgroundColor: 'transparent',
@@ -1934,6 +1938,7 @@ const QueryBuilder = (props: any) => {
                      isRuleValid={isRuleValid} objPermissionsMap={objPermissionsMap} />
                </Box>
                <TabContext value={value}>
+                  <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden' }}>
                   <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                      <TabList
                         onChange={handleChange}
@@ -2222,7 +2227,7 @@ const QueryBuilder = (props: any) => {
                         )}
                      </CustomTabPanel>
                   )}
-
+                  </Box>
                </TabContext>
                {/* saveAs name */}
                <Stack

@@ -90,7 +90,8 @@ export default function MuiPhoneEditor({ field, rule, ruleID, qryBldrRef }: MuiT
          sx={{
             mt: -1,
             '& .MuiInputBase-input': { color: theme.palette.text.primary },
-            width: '250px', // Increased by 50px for better visibility
+            width: '100%',
+            minWidth: 0,
          }}
          error={localErrors.length > 0}
          helperText={localErrors.length > 0 ? localErrors.join(', ') : null}
