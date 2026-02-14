@@ -1,0 +1,9 @@
+@page {
+  size: 18in 10.5in;
+  margin: 0.3in;
+}
+
+svg {
+  width: 100%;
+  height: auto;
+}

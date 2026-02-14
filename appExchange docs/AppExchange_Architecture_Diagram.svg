@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-label="AppGrid architecture diagram">
+  <defs>
+    <style>
+      .label { font-family: Arial, sans-serif; font-size: 24px; font-weight: 600; fill: #0f172a; }
+      .small { font-family: Arial, sans-serif; font-size: 18px; font-weight: 500; fill: #334155; }
+      .notes-title { font-family: Arial, sans-serif; font-size: 26px; font-weight: 700; fill: #0f172a; }
+      .notes-text { font-family: Arial, sans-serif; font-size: 20px; font-weight: 500; fill: #334155; }
+      .box { fill: #f8fafc; stroke: #475569; stroke-width: 3; rx: 12; }
+      .group { fill: #eef2ff; stroke: #3730a3; stroke-width: 3.5; rx: 18; }
+      .ext { fill: #ecfeff; stroke: #0e7490; stroke-width: 3; rx: 12; }
+      .data { fill: #f0fdf4; stroke: #166534; stroke-width: 3; rx: 12; }
+      .arrow { stroke: #0f172a; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0,0 11,4 0,8" fill="#0f172a" />
+    </marker>
+  </defs>
+
+  <!-- Salesforce boundary -->
+  <rect x="250" y="40" width="1050" height="760" class="group" />
+  <text x="285" y="78" class="label">Salesforce Org Boundary</text>
+
+  <!-- Core entities -->
+  <rect x="40" y="10" width="190" height="90" class="box" />
+  <text x="67" y="64" class="label">Salesforce User</text>
+
+  <rect x="300" y="110" width="270" height="90" class="box" />
+  <text x="338" y="164" class="label">Lightning Experience</text>
+
+  <!-- Moved below Lightning to free horizontal space -->
+  <rect x="300" y="250" width="430" height="110" class="box" />
+  <text x="443" y="300" class="label">AppGrid LWC Host</text>
+  <text x="390" y="330" class="small">iframe + LMS + bridge</text>
+
+  <rect x="1010" y="340" width="250" height="105" class="box" />
+  <text x="1088" y="392" class="label">React App</text>
+  <text x="1044" y="421" class="small">Executed in browser iframe</text>
+
+  <rect x="430" y="470" width="320" height="100" class="box" />
+  <text x="472" y="530" class="label">Apex Controllers/Services</text>
+
+  <rect x="490" y="620" width="200" height="95" class="data" />
+  <text x="548" y="677" class="label">SObjects</text>
+
+  <rect x="760" y="620" width="250" height="110" class="data" />
+  <text x="832" y="676" class="label">Encrypted</text>
+  <text x="846" y="705" class="label">Token Store</text>
+
+  <!-- External entities -->
+  <rect x="1310" y="90" width="260" height="110" class="ext" />
+  <text x="1360" y="146" class="label">Cloudflare CDN</text>
+  <text x="1328" y="175" class="small">appgridlwc.com (static assets)</text>
+
+  <rect x="1310" y="520" width="260" height="110" class="ext" />
+  <text x="1360" y="585" class="label">Slack (External)</text>
+
+  <!-- User/UI flows -->
+  <path d="M230 55 L265 55 L265 155 L300 155" class="arrow" />
+  <text x="120" y="48" class="small">UI session</text>
+
+  <path d="M435 200 L435 250" class="arrow" />
+  <text x="448" y="228" class="small">LWC load</text>
+
+  <!-- LWC <-> Cloudflare -->
+  <path d="M730 280 L1310 120" class="arrow" />
+  <text x="980" y="186" class="small">iframe src request</text>
+
+  <path d="M1310 170 L730 330" class="arrow" />
+  <text x="970" y="314" class="small">asset/page delivery</text>
+
+  <!-- LWC <-> React -->
+  <path d="M730 315 L1010 360" class="arrow" />
+  <text x="818" y="352" class="small">postMessage request</text>
+
+  <path d="M1010 410 L730 345" class="arrow" />
+  <text x="822" y="402" class="small">postMessage response</text>
+
+  <!-- LWC <-> Apex -->
+  <path d="M515 360 L515 470" class="arrow" />
+  <text x="530" y="426" class="small">@AuraEnabled request</text>
+
+  <path d="M555 470 L555 360" class="arrow" />
+
+  <!-- Apex -> data -->
+  <path d="M590 570 L590 620" class="arrow" />
+  <text x="606" y="604" class="small">CRUD/FLS in user mode</text>
+
+  <path d="M750 560 L860 620" class="arrow" />
+  <text x="774" y="596" class="small">OAuth token lookup</text>
+
+  <!-- Apex <-> Slack -->
+  <path d="M750 530 L1310 560" class="arrow" />
+  <text x="1018" y="538" class="small">HTTPS/TLS request</text>
+
+  <path d="M1310 600 L750 560" class="arrow" />
+
+  <!-- Boundary notes -->
+  <text x="40" y="845" class="notes-title">Boundary Notes</text>
+  <text x="60" y="872" class="notes-text">- Cloudflare serves static frontend assets only; Salesforce records are not stored in Cloudflare.</text>
+  <text x="60" y="897" class="notes-text">- LWC Host and React bridge traffic uses window.postMessage in-browser (iframe context).</text>
+  <text x="60" y="922" class="notes-text">- Slack traffic is Apex-mediated over HTTPS/TLS; OAuth tokens are stored only in Salesforce encrypted fields.</text>
+</svg>

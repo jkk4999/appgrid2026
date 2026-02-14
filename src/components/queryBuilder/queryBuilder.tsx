@@ -151,7 +151,11 @@ const CustomTabPanel: React.FC<CustomTabPanelProps> = ({
          id={`tabpanel-${index}`}
          aria-labelledby={`tab-${index}`}
       >
-         {(keepMounted || isActive) && <Box>{children}</Box>}
+         {(keepMounted || isActive) && (
+            <Box sx={{ width: '100%', minWidth: 0 }}>
+               {children}
+            </Box>
+         )}
       </div>
    );
 };
@@ -1918,7 +1922,11 @@ const QueryBuilder = (props: any) => {
                   backgroundColor: theme.palette.background.paper,
                   color: theme.palette.text.primary,
                   width: '100%',
-                  height: '100%'
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minWidth: 0,
+                  overflowX: 'hidden',
                }}>
                <Box
                   sx={{ marginTop: 2, marginBottom: 2 }}>
@@ -1929,14 +1937,20 @@ const QueryBuilder = (props: any) => {
                   <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                      <TabList
                         onChange={handleChange}
-                        sx={{ display: 'flex' }} // Ensure the tabs are flex items
+                        sx={{
+                           display: 'flex',
+                           minWidth: 0,
+                           '& .MuiTab-root': {
+                              flex: 1,
+                              minWidth: 0,
+                           },
+                        }} // Ensure the tabs are flex items
                      >
                         <Tab
                            label="Query"
                            value="1"
                            sx={{
                               color: theme.palette.text.primary, // Default color
-                              flex: 1,
                               '&.Mui-selected': {
                                  color: theme.palette.text.primary, // Color when selected
                               },
@@ -1946,7 +1960,6 @@ const QueryBuilder = (props: any) => {
                            value="2"
                            sx={{
                               color: theme.palette.text.primary, // Default color
-                              flex: 1,
                               '&.Mui-selected': {
                                  color: theme.palette.text.primary, // Color when selected
                               },
@@ -1957,7 +1970,6 @@ const QueryBuilder = (props: any) => {
                               value="3"
                               sx={{
                                  color: theme.palette.text.primary, // Default color
-                                 flex: 1,
                                  '&.Mui-selected': {
                                     color: theme.palette.text.primary, // Color when selected
                                  },
@@ -1977,7 +1989,10 @@ const QueryBuilder = (props: any) => {
                            flexGrow: 1,
                            flexDirection: 'column',
                            justifyContent: 'flex-start',
-                           overflow: 'auto',
+                           width: '100%',
+                           minWidth: 0,
+                           overflowY: 'auto',
+                           overflowX: 'hidden',
                            backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                         }}
                      >
@@ -1985,7 +2000,10 @@ const QueryBuilder = (props: any) => {
                         <Stack
                            flexDirection="row"
                            sx={{
-                              flexFlow: 1
+                              flexFlow: 1,
+                              width: '100%',
+                              minWidth: 0,
+                              overflowX: 'hidden',
                            }}
                         >
                            {/* query delete confirmation dialog */}
@@ -1999,31 +2017,33 @@ const QueryBuilder = (props: any) => {
 
                            {/* Conditional Rendering for QueryBuilderComponent */}
                            {selectedObjMetadata && queryBuilderColumns.length > 0 ? (
-                              <QueryBuilderComponent
-                                 id="querybuilder"
-                                 ref={qryBldrRef}
-                                 key={selectedObject?.qualifiedApiName || 'qb-main'}
-                                 columns={queryBuilderColumns}
-                                 displayMode="Horizontal"
-                                 fieldModel={mainFieldModel}
-                                 dataSource={rowData} // Ensure rowData is used as intended or remove
-                                 enableNotCondition={true}
-                                 created={() => {
-                                    setIsQueryBuilderMounted(true); // Signal component is mounted
-                                    // Validate rules now that component is created with columns
-                                    if (qryBldrRef.current) {
-                                       const rule = qryBldrRef.current.getRules() || { condition: 'and', rules: [] };
-                                       updateMainRuleValidity(validateRule(rule));
-                                       setCurrentQueryRule(rule);
-                                    }
-                                 }}
-                                 rule={currentQueryRule}
-                                 ruleChange={onRuleChange}
-                                 change={onRuleChange}
-                                 sortDirection="Ascending"
-                                 showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
-                                 width="100%"
-                              />
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                 <QueryBuilderComponent
+                                    id="querybuilder"
+                                    ref={qryBldrRef}
+                                    key={selectedObject?.qualifiedApiName || 'qb-main'}
+                                    columns={queryBuilderColumns}
+                                    displayMode="Horizontal"
+                                    fieldModel={mainFieldModel}
+                                    dataSource={rowData} // Ensure rowData is used as intended or remove
+                                    enableNotCondition={true}
+                                    created={() => {
+                                       setIsQueryBuilderMounted(true); // Signal component is mounted
+                                       // Validate rules now that component is created with columns
+                                       if (qryBldrRef.current) {
+                                          const rule = qryBldrRef.current.getRules() || { condition: 'and', rules: [] };
+                                          updateMainRuleValidity(validateRule(rule));
+                                          setCurrentQueryRule(rule);
+                                       }
+                                    }}
+                                    rule={currentQueryRule}
+                                    ruleChange={onRuleChange}
+                                    change={onRuleChange}
+                                    sortDirection="Ascending"
+                                    showButtons={{ ruleDelete: true, groupInsert: true, groupDelete: true }}
+                                    width="100%"
+                                 />
+                              </Box>
                            ) : (
                               // Placeholder content while loading or if no columns
                               <Box
@@ -2094,7 +2114,10 @@ const QueryBuilder = (props: any) => {
                            flexGrow: 1,
                            flexDirection: 'column',
                            justifyContent: 'flex-start',
-                           overflow: 'auto',
+                           width: '100%',
+                           minWidth: 0,
+                           overflowY: 'auto',
+                           overflowX: 'hidden',
                            backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                         }}
                      >

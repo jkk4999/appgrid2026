@@ -1,0 +1,17 @@
+@page {
+  size: 14in 8.5in;
+  margin: 0.4in;
+}
+
+body {
+  max-width: none !important;
+  width: auto !important;
+  margin: 0 !important;
+  font-family: Arial, sans-serif;
+}
+
+img {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+}
