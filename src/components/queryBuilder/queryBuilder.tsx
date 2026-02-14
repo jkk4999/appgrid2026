@@ -1927,7 +1927,7 @@ const QueryBuilder = (props: any) => {
                   flex: 1,
                   minHeight: 0,
                   minWidth: 0,
-                  overflow: 'hidden',
+                  overflow: 'auto',
                }}>
                <Box
                   sx={{ marginTop: 2, marginBottom: 2 }}>
@@ -1935,7 +1935,7 @@ const QueryBuilder = (props: any) => {
                      isRuleValid={isRuleValid} objPermissionsMap={objPermissionsMap} />
                </Box>
                <TabContext value={value}>
-                  <Box sx={{ width: '100%', minWidth: 0, overflowX: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                  <Box sx={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <TabList
                            onChange={handleChange}
@@ -1994,8 +1994,7 @@ const QueryBuilder = (props: any) => {
                               justifyContent: 'flex-start',
                               width: '100%',
                               minWidth: 0,
-                              overflowY: 'auto',
-                              overflowX: 'auto',
+                              overflow: 'auto',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
@@ -2121,8 +2120,7 @@ const QueryBuilder = (props: any) => {
                               justifyContent: 'flex-start',
                               width: '90%',
                               minWidth: 0,
-                              overflowY: 'auto',
-                              overflowX: 'auto',
+                              overflow: 'auto',
                               backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary
                            }}
                         >
