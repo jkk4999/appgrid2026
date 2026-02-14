@@ -138,6 +138,61 @@
   background-color: #2d2d2d !important;
 }
 
+/* QueryBuilder dialog: allow Syncfusion rule rows to fit available dialog width */
+.appgrid-qb-fit,
+.appgrid-qb-fit.e-querybuilder,
+.appgrid-qb-fit.e-query-builder {
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+}
+
+.appgrid-qb-fit .e-group-container,
+.appgrid-qb-fit .e-rule-list,
+.appgrid-qb-fit .e-rule-content {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.appgrid-qb-fit .e-rule-container,
+.appgrid-qb-fit .e-rule-container.e-horizontal-mode {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: 10px !important;
+}
+
+.appgrid-qb-fit .e-rule-container > .e-rule-field,
+.appgrid-qb-fit .e-horizontal-mode > .e-rule-field {
+  flex: 1 1 240px !important;
+  min-width: 180px !important;
+}
+
+.appgrid-qb-fit .e-rule-container > .e-rule-operator,
+.appgrid-qb-fit .e-horizontal-mode > .e-rule-operator {
+  flex: 1 1 200px !important;
+  min-width: 160px !important;
+  width: auto !important;
+}
+
+.appgrid-qb-fit .e-rule-operator .e-control-wrapper.e-ddl {
+  width: 100% !important;
+}
+
+.appgrid-qb-fit .e-rule-container > .e-rule-value,
+.appgrid-qb-fit .e-horizontal-mode > .e-rule-value {
+  flex: 2 1 320px !important;
+  min-width: 220px !important;
+  width: auto !important;
+}
+
+.appgrid-qb-fit .e-rule-container > .e-rule-delete,
+.appgrid-qb-fit .e-horizontal-mode > .e-rule-delete {
+  flex: 0 0 auto !important;
+  margin-left: 0 !important;
+}
+
 /*
  * ===================================================================
  * Dark Mode Fix for Pivot View Group Column Text Color

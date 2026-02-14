@@ -2020,6 +2020,7 @@ const QueryBuilder = (props: any) => {
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                  <QueryBuilderComponent
                                     id="querybuilder"
+                                    cssClass="appgrid-qb-fit"
                                     ref={qryBldrRef}
                                     key={selectedObject?.qualifiedApiName || 'qb-main'}
                                     columns={queryBuilderColumns}
@@ -2178,6 +2179,7 @@ const QueryBuilder = (props: any) => {
                         {subQueryBuilderColumns.length > 0 && relatedQueryRule.rules && (
                            <QueryBuilderComponent
                               id="subQueryBuilder"
+                              cssClass="appgrid-qb-fit"
                               key={JSON.stringify(relatedQueryRule)}
                               ref={subQryBldrRef}
                               columns={subQueryBuilderColumns}
