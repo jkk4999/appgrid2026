@@ -735,28 +735,9 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
       // Update the per-relation view with the new ID if it was a new record
       // Use ref to get current view, avoiding stale closure issues
       const currentView = selectedSubgridViewRef.current;
-      prettyPrint('[Subgrid] onAfterSuccess(save view)', {
-        relation: sObjectApiName,
-        savedId: id,
-        currentViewId: (currentView as any)?.id || (currentView as any)?.Id || null,
-        hasPayload: !!payload,
-        payloadColumnStateLen: (() => {
-          try {
-            const raw = (payload as any)?.AppGridAg__Column_State__c;
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed.length : 0;
-          } catch {
-            return -1;
-          }
-        })(),
-      }, 'cyan');
       if (id && currentView && currentView.id !== id) {
         const updatedView = { ...currentView, id, Id: id } as any;
         setSubgridViewForRelation(sObjectApiName, updatedView);
-        prettyPrint('[Subgrid] onAfterSuccess(new id) setSubgridViewForRelation', {
-          relation: sObjectApiName,
-          newViewId: id,
-        }, 'green');
         await reloadViews();
         return;
       }
@@ -766,21 +747,11 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
       // IMPORTANT: do NOT set selected view here; that retriggers view-apply
       // and can snap columns back while user is interacting.
       if (id && currentView && payload) {
-        let didUpdateOption = false;
         setSubgridViewOptionsForRelation(sObjectApiName, (prev: any[]) =>
-          (Array.isArray(prev) ? prev : []).map((v: any) => {
-            if ((v?.id || v?.Id) === id) {
-              didUpdateOption = true;
-              return { ...v, ...payload, id, Id: id };
-            }
-            return v;
-          })
+          (Array.isArray(prev) ? prev : []).map((v: any) =>
+            (v?.id || v?.Id) === id ? { ...v, ...payload, id, Id: id } : v
+          )
         );
-        prettyPrint('[Subgrid] onAfterSuccess(existing id) updated view options', {
-          relation: sObjectApiName,
-          targetViewId: id,
-          didUpdateOption,
-        }, didUpdateOption ? 'green' : 'orange');
       }
     },
     enqueueSnackbar,
