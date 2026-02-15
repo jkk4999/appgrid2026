@@ -731,28 +731,20 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
 
       return { success: true, id: r.recordId || '', errorMessage: undefined };
     },
-    onAfterSuccess: async (id, payload) => {
+    onAfterSuccess: async (id) => {
       // Update the per-relation view with the new ID if it was a new record
       // Use ref to get current view, avoiding stale closure issues
       const currentView = selectedSubgridViewRef.current;
       if (id && currentView && currentView.id !== id) {
-        const updatedView = { ...currentView, id, Id: id } as any;
+        const updatedView = { ...currentView, id, Id: id };
         setSubgridViewForRelation(sObjectApiName, updatedView);
+        // Only reload views when a NEW view was created (id changed)
+        // This prevents duplicate queries on every state save
         await reloadViews();
-        return;
       }
-
-      // Existing view save: update local selected view and relation view-options
-      // so switching away/back does not show stale state.
-      if (id && currentView && payload) {
-        const mergedView = { ...currentView, ...payload, id, Id: id } as any;
-        setSubgridViewForRelation(sObjectApiName, mergedView);
-        setSubgridViewOptionsForRelation(sObjectApiName, (prev: any[]) =>
-          (Array.isArray(prev) ? prev : []).map((v: any) =>
-            (v?.id || v?.Id) === id ? { ...v, ...payload, id, Id: id } : v
-          )
-        );
-      }
+      // Note: We intentionally do NOT reload views on every state save
+      // Reloading is only needed when a new view is created (above) or
+      // when explicitly triggered by user actions like creating/deleting views
     },
     enqueueSnackbar,
     action,
