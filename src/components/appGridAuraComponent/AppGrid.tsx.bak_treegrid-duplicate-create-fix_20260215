@@ -1009,7 +1009,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    const [selectedRow, setSelectedRow] = useState(null);
 
    const selectedViewRecordId = useRef('');
-   const modeViewCreateLocksRef = useRef<Map<string, Promise<void>>>(new Map());
 
    const isPropertyPanelVisible =
       showCalculatedColumnPanel ||
@@ -3282,7 +3281,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       const loadModeViews = async () => {
          try {
             let createdDefaultTreeView = false;
-            const modeKey = `${selectedObjectApiName}::${isTreeGrid ? 'tree' : 'grid'}`;
             const modeParams: ObjViewParams = {
                sObjectName: selectedObjectApiName,
                isSubgridView: false,
@@ -3292,102 +3290,83 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             let modeViews = filterViewsByGridType(modeViewsFromApi, isTreeGrid);
 
             if (modeViews.length === 0) {
-               const existingCreate = modeViewCreateLocksRef.current.get(modeKey);
-               let createPromise = existingCreate;
-               let createdByThisEffect = false;
+               const metadata = selectedObjMetadata || objMetadataMap.current.get(selectedObjectApiName) || null;
 
-               if (!createPromise) {
-                  createdByThisEffect = true;
-                  createPromise = (async () => {
-                     const metadata = selectedObjMetadata || objMetadataMap.current.get(selectedObjectApiName) || null;
-
-                     let seedColumnState: any[] = [];
-                     if (isTreeGrid) {
-                        let regularViews: SObjectView[] = [];
-                        try {
-                           const regularParams: ObjViewParams = {
-                              sObjectName: selectedObjectApiName,
-                              isSubgridView: false,
-                              isTreeGridView: false,
-                           };
-                           const regularViewsFromApi = await apiClient.getObjViews(regularParams);
-                           regularViews = filterViewsByGridType(regularViewsFromApi, false);
-                        } catch {
-                           regularViews = [];
-                        }
-                        const seedRegularView =
-                           regularViews.find((v) => v.id && v.id === selectedView?.id) || regularViews[0] || null;
-                        if (seedRegularView?.columnState) {
-                           try {
-                              seedColumnState = JSON.parse(seedRegularView.columnState) || [];
-                           } catch {
-                              seedColumnState = [];
-                           }
-                        }
-                     }
-                     if (!seedColumnState.length && gridApi) {
-                        seedColumnState = gridApi.getColumnState?.() || [];
-                     }
-
-                     const storeState = useStore.getState();
-                     const payload: any = {
-                        Name: isTreeGrid ? 'Default Tree View' : 'Default View',
-                        AppGridAg__SObjectApiName__c: selectedObjectApiName,
-                        AppGridAg__Grid_State__c: JSON.stringify((gridApi as any)?.getState?.() ?? {}),
-                        AppGridAg__Column_State__c: JSON.stringify(seedColumnState),
-                        AppGridAg__Calculated_Columns__c: JSON.stringify(storeState.objCalculatedColumns || []),
-                        AppGridAg__Column_Styles__c: JSON.stringify(storeState.objColumnStyles || []),
-                        AppGridAg__Row_Styles__c: JSON.stringify(storeState.objRowStyles || []),
-                        AppGridAg__IsSubgridView__c: false,
-                        AppGridAg__IsTreegridView__c: isTreeGrid,
-                        AppGridAg__Pivot_Mode__c: false,
-                        AppGridAg__FilterOptions__c: JSON.stringify(filterOptions || []),
-                        AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
-                        AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
+               let seedColumnState: any[] = [];
+               if (isTreeGrid) {
+                  let regularViews: SObjectView[] = [];
+                  try {
+                     const regularParams: ObjViewParams = {
+                        sObjectName: selectedObjectApiName,
+                        isSubgridView: false,
+                        isTreeGridView: false,
                      };
-
-                     const upsertResult = await apiClient.upsertRecs({
-                        sObjectName: 'AppGridAg__AG_View__c',
-                        jsonRecs: JSON.stringify([payload]),
-                     });
-
-                     if (!(upsertResult.status === 'success' && upsertResult.results?.[0]?.isSuccess)) {
-                        throw new Error(`Failed to create default ${isTreeGrid ? 'Tree Grid' : 'Grid'} view`);
+                     const regularViewsFromApi = await apiClient.getObjViews(regularParams);
+                     regularViews = filterViewsByGridType(regularViewsFromApi, false);
+                  } catch {
+                     regularViews = [];
+                  }
+                  const seedRegularView =
+                     regularViews.find((v) => v.id && v.id === selectedView?.id) || regularViews[0] || null;
+                  if (seedRegularView?.columnState) {
+                     try {
+                        seedColumnState = JSON.parse(seedRegularView.columnState) || [];
+                     } catch {
+                        seedColumnState = [];
                      }
-
-                     if (isTreeGrid) {
-                        const selfLookup = findSelfLookupField(metadata);
-                        if (!selfLookup?.name) {
-                           enqueueSnackbar('Tree Grid requires a self-referencing lookup field.', {
-                              action,
-                              variant: 'warning',
-                           });
-                        } else {
-                           const currentPrefs: any = treeGridPreferences || {};
-                           const derivedGroupField = currentPrefs?.groupField || currentPrefs?.AppGridAg__Group_Field__c || metadata?.fields?.find((f: any) => f?.isNameField)?.name || 'Name';
-                           setTreeGridPreferences({
-                              ...currentPrefs,
-                              AppGridAg__Parent_Lookup_Field__c: selfLookup.name,
-                              AppGridAg__Group_Field__c: derivedGroupField,
-                              parentLookupField: selfLookup.name,
-                              groupField: derivedGroupField,
-                           } as any);
-                        }
-                     }
-                  })();
-                  modeViewCreateLocksRef.current.set(modeKey, createPromise);
-               }
-
-               try {
-                  await createPromise;
-               } finally {
-                  if (modeViewCreateLocksRef.current.get(modeKey) === createPromise) {
-                     modeViewCreateLocksRef.current.delete(modeKey);
                   }
                }
+               if (!seedColumnState.length && gridApi) {
+                  seedColumnState = gridApi.getColumnState?.() || [];
+               }
 
-               if (createdByThisEffect && isTreeGrid) {
+               const storeState = useStore.getState();
+               const payload: any = {
+                  Name: isTreeGrid ? 'Default Tree View' : 'Default View',
+                  AppGridAg__SObjectApiName__c: selectedObjectApiName,
+                  AppGridAg__Grid_State__c: JSON.stringify((gridApi as any)?.getState?.() ?? {}),
+                  AppGridAg__Column_State__c: JSON.stringify(seedColumnState),
+                  AppGridAg__Calculated_Columns__c: JSON.stringify(storeState.objCalculatedColumns || []),
+                  AppGridAg__Column_Styles__c: JSON.stringify(storeState.objColumnStyles || []),
+                  AppGridAg__Row_Styles__c: JSON.stringify(storeState.objRowStyles || []),
+                  AppGridAg__IsSubgridView__c: false,
+                  AppGridAg__IsTreegridView__c: isTreeGrid,
+                  AppGridAg__Pivot_Mode__c: false,
+                  AppGridAg__FilterOptions__c: JSON.stringify(filterOptions || []),
+                  AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
+                  AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
+               };
+
+               const upsertResult = await apiClient.upsertRecs({
+                  sObjectName: 'AppGridAg__AG_View__c',
+                  jsonRecs: JSON.stringify([payload]),
+               });
+
+               if (!(upsertResult.status === 'success' && upsertResult.results?.[0]?.isSuccess)) {
+                  throw new Error(`Failed to create default ${isTreeGrid ? 'Tree Grid' : 'Grid'} view`);
+               }
+               if (isTreeGrid) {
                   createdDefaultTreeView = true;
+               }
+
+               if (isTreeGrid) {
+                  const selfLookup = findSelfLookupField(metadata);
+                  if (!selfLookup?.name) {
+                     enqueueSnackbar('Tree Grid requires a self-referencing lookup field.', {
+                        action,
+                        variant: 'warning',
+                     });
+                  } else {
+                     const currentPrefs: any = treeGridPreferences || {};
+                     const derivedGroupField = currentPrefs?.groupField || currentPrefs?.AppGridAg__Group_Field__c || metadata?.fields?.find((f: any) => f?.isNameField)?.name || 'Name';
+                     setTreeGridPreferences({
+                        ...currentPrefs,
+                        AppGridAg__Parent_Lookup_Field__c: selfLookup.name,
+                        AppGridAg__Group_Field__c: derivedGroupField,
+                        parentLookupField: selfLookup.name,
+                        groupField: derivedGroupField,
+                     } as any);
+                  }
                }
 
                const refreshed = await apiClient.getObjViews(modeParams);
@@ -3433,6 +3412,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       objViewsRetrieved,
       selectedObjectApiName,
       selectedObjMetadata,
+      selectedView?.id,
       setSelectedView,
       setSelectedViewRecordId,
       setTreeGridPreferences,
