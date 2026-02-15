@@ -1010,7 +1010,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
    const selectedViewRecordId = useRef('');
    const modeViewCreateLocksRef = useRef<Map<string, Promise<void>>>(new Map());
-   const modeViewCreateToastShownRef = useRef<Set<string>>(new Set());
 
    const isPropertyPanelVisible =
       showCalculatedColumnPanel ||
@@ -3282,6 +3281,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
       const loadModeViews = async () => {
          try {
+            let createdDefaultTreeView = false;
             const modeKey = `${selectedObjectApiName}::${isTreeGrid ? 'tree' : 'grid'}`;
             const modeParams: ObjViewParams = {
                sObjectName: selectedObjectApiName,
@@ -3354,20 +3354,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                      if (!(upsertResult.status === 'success' && upsertResult.results?.[0]?.isSuccess)) {
                         throw new Error(`Failed to create default ${isTreeGrid ? 'Tree Grid' : 'Grid'} view`);
                      }
-                     if (
-                        createdByThisEffect &&
-                        isTreeGrid &&
-                        !modeViewCreateToastShownRef.current.has(modeKey)
-                     ) {
-                        modeViewCreateToastShownRef.current.add(modeKey);
-                        enqueueSnackbar('Default treegrid view created', {
-                           action,
-                           variant: 'info',
-                           autoHideDuration: 3000,
-                           preventDuplicate: false,
-                           key: `default-treegrid-view-created-${modeKey}-${Date.now()}`,
-                        });
-                     }
 
                      if (isTreeGrid) {
                         const selfLookup = findSelfLookupField(metadata);
@@ -3400,6 +3386,10 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                   }
                }
 
+               if (createdByThisEffect && isTreeGrid) {
+                  createdDefaultTreeView = true;
+               }
+
                const refreshed = await apiClient.getObjViews(modeParams);
                modeViews = filterViewsByGridType(refreshed, isTreeGrid);
             }
@@ -3411,6 +3401,15 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             const nextView = modeViews.find((v) => v.id && v.id === currentId) || modeViews[0] || null;
             setSelectedView(nextView as any);
             setSelectedViewRecordId(nextView?.id || '');
+            if (createdDefaultTreeView) {
+               enqueueSnackbar('Default treegrid view created', {
+                  action,
+                  variant: 'info',
+                  autoHideDuration: 3000,
+                  preventDuplicate: false,
+                  key: `default-treegrid-view-created-${Date.now()}`,
+               });
+            }
          } catch (e: any) {
             prettyPrint('[AppGrid] Error loading mode-specific views', { message: e?.message, stack: e?.stack }, 'red');
             enqueueSnackbar(e?.message || 'Error loading views', { action, variant: 'error' });
