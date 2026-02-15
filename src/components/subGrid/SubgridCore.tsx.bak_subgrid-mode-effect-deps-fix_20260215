@@ -1605,9 +1605,15 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     gridPrefsLoaded,
     isActive,
     isTreeSubgridMode,
+    relationName,
     sObjectApiName,
+    selectedSubgridView,
+    setSubgridTreeGridPreferenceRecId,
+    setSubgridTreeGridPreferences,
     setSubgridViewForRelation,
     setSubgridViewOptionsForRelation,
+    showSubgridAdvancedFilter,
+    subgridFilterOptions,
     suspendSaves,
   ]);
 
