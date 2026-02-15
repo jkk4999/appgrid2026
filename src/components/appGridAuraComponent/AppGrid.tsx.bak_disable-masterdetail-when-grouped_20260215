@@ -862,7 +862,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
    const [groupDisplayType] =
       useState<RowGroupingDisplayType>('multipleColumns');
-   const [rowGroupingActive, setRowGroupingActive] = useState(false);
 
    // Reflects whether the grid currently has treeData enabled to coordinate props vs. effects
    const [treeDataActive, setTreeDataActive] = useState(false);
@@ -1612,7 +1611,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
       const rowGroupCols = apiAny.getRowGroupColumns?.() || [];
       const hasRowGrouping = rowGroupCols.length > 0;
-      setRowGroupingActive(hasRowGrouping);
       const showEditColumn = !hasRowGrouping;
 
       apiAny.setColumnsVisible?.(['editAction'], showEditColumn);
@@ -2678,8 +2676,8 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    }, []);
 
    const isRowMaster = useCallback(() => {
-      // Disable master-detail when using Tree Grid or row grouping.
-      if (treeDataActive || rowGroupingActive) return false;
+      // Disable master-detail when using Tree Grid
+      if (treeDataActive) return false;
       // check if this object has relationships
       if (relationPreferences) {
          const isMasterRow = relationPreferences.some(
@@ -2688,7 +2686,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          return isMasterRow;
       }
       return false;
-   }, [relationPreferences, treeDataActive, rowGroupingActive]);
+   }, [relationPreferences, treeDataActive]);
 
 
    // Apply row styles based on configured rules, with rgba + exclude flags
@@ -4609,7 +4607,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                         getRowStyle={getRowStyle}
                         isRowMaster={isRowMaster}
                         groupDisplayType={treeDataActive ? 'singleColumn' : groupDisplayType}
-                        masterDetail={!treeDataActive && !rowGroupingActive}
+                        masterDetail={!treeDataActive}
                         onToolPanelVisibleChanged={() => { /* handled via explicit open/close */ }}
                         onCellMouseDown={(event: CellMouseDownEvent) => {
                            currentCellInfo.current = {
