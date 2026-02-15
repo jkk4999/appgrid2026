@@ -767,27 +767,11 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
       // and can snap columns back while user is interacting.
       if (id && currentView && payload) {
         let didUpdateOption = false;
-        const normalizedPatch = {
-          columnState: (payload as any)?.AppGridAg__Column_State__c ?? (payload as any)?.columnState,
-          gridState: (payload as any)?.AppGridAg__Grid_State__c ?? (payload as any)?.gridState,
-          calculatedColumns: (payload as any)?.AppGridAg__Calculated_Columns__c ?? (payload as any)?.calculatedColumns,
-          columnStyles: (payload as any)?.AppGridAg__Column_Styles__c ?? (payload as any)?.columnStyles,
-          rowStyles: (payload as any)?.AppGridAg__Row_Styles__c ?? (payload as any)?.rowStyles,
-          filterOptions: (payload as any)?.AppGridAg__FilterOptions__c ?? (payload as any)?.filterOptions,
-          showAdvancedFilter:
-            (payload as any)?.AppGridAg__ShowAdvancedFilter__c ?? (payload as any)?.showAdvancedFilter,
-          pivotMode: (payload as any)?.AppGridAg__Pivot_Mode__c ?? (payload as any)?.pivotMode,
-          parentFields: (payload as any)?.AppGridAg__Parent_Fields__c ?? (payload as any)?.parentFields,
-          isSubgridView:
-            (payload as any)?.AppGridAg__IsSubgridView__c ?? (payload as any)?.isSubgridView,
-          isTreegridView:
-            (payload as any)?.AppGridAg__IsTreegridView__c ?? (payload as any)?.isTreegridView,
-        } as any;
         setSubgridViewOptionsForRelation(sObjectApiName, (prev: any[]) =>
           (Array.isArray(prev) ? prev : []).map((v: any) => {
             if ((v?.id || v?.Id) === id) {
               didUpdateOption = true;
-              return { ...v, ...payload, ...normalizedPatch, id, Id: id };
+              return { ...v, ...payload, id, Id: id };
             }
             return v;
           })
