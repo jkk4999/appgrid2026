@@ -54,6 +54,7 @@ import {
   useThemeState,
   useRecordTypeState,
   // Unified context-based hooks
+  useGridViewState,
   useGridFilterState,
   useGridPivotState,
   useGridDialogState,
@@ -230,6 +231,13 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
 
   const setSubgridViewOptionsForRelation = useStore((state) => state.setSubgridViewOptionsForRelation);
 
+  // Keep legacy setters for backward compatibility with other code that still uses them
+  // But these now only update the global state (not used for display)
+  const {
+    setSelectedView: setSelectedSubgridView,
+    setViewOptions: setSubgridViewOptions,
+  } = useGridViewState('subgrid');
+
   // Subgrid filter state - using unified hook with 'subgrid' context
   const {
     filterOptions: subgridFilterOptions,
@@ -301,10 +309,8 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
 
   const gridRef = useRef<any>(null);
 
-  // Track loaded view mode key (object + mode) to avoid duplicate loads
-  const viewsLoadedModeKeyRef = useRef('');
-  const modeViewCreateLocksRef = useRef<Map<string, Promise<void>>>(new Map());
-  const modeViewCreateToastShownRef = useRef<Set<string>>(new Set());
+  // prevents views useEffect from running more than once
+  const viewsLoadedRef = useRef(false);
 
   const initialApplyDoneRef = useRef<boolean>(false);
 
@@ -456,16 +462,6 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
   // Derive per-relation view state based on sObjectApiName
   // We ONLY use per-relation state - global state causes race conditions when switching tabs
   const selectedSubgridView = subgridViewByRelation[sObjectApiName] ?? null;
-  const relationGridTypeName = ((relation as any)?.selectedGridType || 'gridView').toLowerCase().replace(/\s+/g, '');
-  const isTreeSubgridMode = selectedSubgridType?.name === 'treeGrid' && relationGridTypeName === 'treegrid';
-  const isTreeViewRecord = useCallback((view: any): boolean => {
-    if (!view) return false;
-    return Boolean(view?.isTreegridView ?? view?.AppGridAg__IsTreegridView__c);
-  }, []);
-  const filterViewsByGridType = useCallback((views: any[] | undefined | null, treeMode: boolean) => {
-    const input = Array.isArray(views) ? views : [];
-    return input.filter((v) => isTreeViewRecord(v) === treeMode);
-  }, [isTreeViewRecord]);
 
   // Keep refs in sync with state for canSaveNow closure
   initialDataLoadedRef.current = initialDataLoaded;
@@ -687,7 +683,6 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
       const view = selectedSubgridViewRef.current as any;
       const viewName = view?.name || view?.Name || 'Default View';
       const viewId = view?.id || view?.Id;
-      const selectedViewTreeFlag = view ? isTreeViewRecord(view) : isTreeSubgridMode;
 
       const payload: any = {
         Name: viewName,
@@ -695,7 +690,6 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
         AppGridAg__Grid_State__c: JSON.stringify(gridState || {}),
         AppGridAg__Column_State__c: JSON.stringify(colState || []),
         AppGridAg__IsSubgridView__c: true,
-        AppGridAg__IsTreegridView__c: selectedViewTreeFlag,
         AppGridAg__ShowAdvancedFilter__c: !!showSubgridAdvancedFilter,
         AppGridAg__Calculated_Columns__c: JSON.stringify(extras.calculatedColumns || []),
         AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles || []),
@@ -1150,9 +1144,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     getGridApi: () => gridApiRef.current as any,
     sObjectApiName: relation?.name as string,
     isSubgrid: true,
-    isTreeGridView: isTreeSubgridMode,
     upsert: async (payload: any) => {
-      payload.AppGridAg__IsTreegridView__c = isTreeSubgridMode;
       const upsertRecs = [payload];
 
       const newViewName = payload.Name;
@@ -1187,22 +1179,17 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     },
     fetchViews: async () => {
       try {
-        const reloadedViews = await apiClient.getObjViews({
-          sObjectName: relation?.name as string,
-          isSubgridView: true,
-          isTreeGridView: isTreeSubgridMode,
-        });
-        const filtered = filterViewsByGridType(reloadedViews, isTreeSubgridMode);
+        const reloadedViews = await apiClient.getObjViews({ sObjectName: relation?.name as string, isSubgridView: true });
 
-        setSubgridViewOptionsForRelation(sObjectApiName, filtered);
+        setSubgridViewOptionsForRelation(sObjectApiName, reloadedViews);
 
-        return filtered;
+        return reloadedViews;
       } catch {
         return [];
       }
     },
-    setViewOptions: (views: any[]) => setSubgridViewOptionsForRelation(sObjectApiName, views as any),
-    setSelectedView: (v: any) => setSubgridViewForRelation(sObjectApiName, v as any),
+    setViewOptions: (views: any[]) => setSubgridViewOptions(views as any),
+    setSelectedView: (v: any) => setSelectedSubgridView(v as any),
     getParentFields: () => parentFieldsJson,
     // Provide metadata for building proper default column state when grid is empty
     getMetadata: () => objMetadataMap.current?.get(sObjectApiName) || null
@@ -1395,7 +1382,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
     loadView(view);
   }, [action, enforceControlColumnsOrder, enqueueSnackbar, gridApiRef, resumeSaves, saveLastViewUsed, suspendSaves]);
 
-  // ✅ Unified mode-scoped view loading effect (regular vs tree for subgrid)
+  // ✅ Unified view loading effect - waits for gridApi to be ready before fetching views.  If no views exist, creates a default view immediately (since gridApi is available)
   useEffect(() => {
     // Only proceed if this tab has been activated (use ref for synchronous check)
     if (!shouldLoadRef.current) {
@@ -1406,139 +1393,55 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
       return;
     }
 
-    const modeKey = `${sObjectApiName}::${isTreeSubgridMode ? 'tree' : 'grid'}`;
-
-    // Prevent duplicate in-flight loads for the same mode
-    if (loadingRelationsSet.has(modeKey)) {
+    // Prevent duplicate in-flight loads (but allow retry later)
+    if (loadingRelationsSet.has(sObjectApiName)) {
       return;
     }
 
-    // If views already loaded for this mode, do nothing
-    if (viewsLoadedModeKeyRef.current === modeKey) {
+    // If views already loaded for this mount, do nothing
+    if (viewsLoadedRef.current) {
       return;
     }
 
     // Suspend saves during initial load to prevent AG Grid init events from triggering saves
     suspendSaves('initial-load');
 
-    loadingRelationsSet.add(modeKey);
+    loadingRelationsSet.add(sObjectApiName);
 
     const run = async () => {
       try {
-        const modeParams = {
+        const views = await apiClient.getObjViews({
           sObjectName: sObjectApiName,
           isSubgridView: true,
-          isTreeGridView: isTreeSubgridMode,
-        };
+        });
 
-        const modeViewsFromApi = await apiClient.getObjViews(modeParams);
-        let modeViews = filterViewsByGridType(modeViewsFromApi, isTreeSubgridMode);
+        if (views.length === 0) {
+          await createDefaultView();
 
-        if (modeViews.length === 0) {
-          const existingCreate = modeViewCreateLocksRef.current.get(modeKey);
-          let createPromise = existingCreate;
-          let createdByThisEffect = false;
+          const reloadedViews = await reloadViews();
 
-          if (!createPromise) {
-            createdByThisEffect = true;
-            createPromise = (async () => {
-              let seedColumnState: any[] = [];
-
-              if (isTreeSubgridMode) {
-                try {
-                  const regularViewsFromApi = await apiClient.getObjViews({
-                    sObjectName: sObjectApiName,
-                    isSubgridView: true,
-                    isTreeGridView: false,
-                  });
-                  const regularViews = filterViewsByGridType(regularViewsFromApi, false);
-                  const seedRegularView =
-                    regularViews.find((v: any) => (v?.id || v?.Id) === (selectedSubgridView as any)?.id) ||
-                    regularViews[0] ||
-                    null;
-                  if (seedRegularView?.columnState) {
-                    try {
-                      seedColumnState = JSON.parse(seedRegularView.columnState) || [];
-                    } catch {
-                      seedColumnState = [];
-                    }
-                  }
-                } catch {
-                  seedColumnState = [];
-                }
-              }
-
-              if (!seedColumnState.length) {
-                seedColumnState = (gridApiRef.current as any)?.getColumnState?.() || [];
-              }
-
-              const store = useStore.getState();
-              const payload: any = {
-                Name: isTreeSubgridMode ? 'Default Tree View' : 'Default View',
-                AppGridAg__SObjectApiName__c: sObjectApiName,
-                AppGridAg__Grid_State__c: JSON.stringify((gridApiRef.current as any)?.getState?.() ?? {}),
-                AppGridAg__Column_State__c: JSON.stringify(seedColumnState),
-                AppGridAg__Calculated_Columns__c: JSON.stringify(store.objCalculatedSubgridColumns || []),
-                AppGridAg__Column_Styles__c: JSON.stringify(store.objSubgridColumnStyles || []),
-                AppGridAg__Row_Styles__c: JSON.stringify(store.objSubgridRowStyles || []),
-                AppGridAg__IsSubgridView__c: true,
-                AppGridAg__IsTreegridView__c: isTreeSubgridMode,
-                AppGridAg__Pivot_Mode__c: false,
-                AppGridAg__FilterOptions__c: JSON.stringify(subgridFilterOptions || []),
-                AppGridAg__ShowAdvancedFilter__c: !!showSubgridAdvancedFilter,
-                AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
-              };
-
-              const upsertResult = await apiClient.upsertRecs({
-                sObjectName: 'AppGridAg__AG_View__c',
-                jsonRecs: JSON.stringify([payload]),
-              });
-
-              if (!(upsertResult.status === 'success' && upsertResult.results?.[0]?.isSuccess)) {
-                throw new Error(`Failed to create default ${isTreeSubgridMode ? 'Tree Grid' : 'Grid'} subgrid view`);
-              }
-
-              if (
-                createdByThisEffect &&
-                isTreeSubgridMode &&
-                !modeViewCreateToastShownRef.current.has(modeKey)
-              ) {
-                modeViewCreateToastShownRef.current.add(modeKey);
-                enqueueSnackbar('Default treegrid view created', {
-                  action,
-                  variant: 'info',
-                  autoHideDuration: 3000,
-                  preventDuplicate: false,
-                  key: `default-subgrid-treegrid-view-created-${modeKey}-${Date.now()}`,
-                });
-              }
-            })();
-            modeViewCreateLocksRef.current.set(modeKey, createPromise);
+          if (!reloadedViews.length) {
+            throw new Error('reloadViews returned empty after default creation');
           }
 
-          try {
-            await createPromise;
-          } finally {
-            if (modeViewCreateLocksRef.current.get(modeKey) === createPromise) {
-              modeViewCreateLocksRef.current.delete(modeKey);
-            }
+          // setSubgridViewOptionsForRelation(sObjectApiName, reloadedViews);
+
+          setSubgridViewForRelation(sObjectApiName, reloadedViews[0]);
+        } else {
+          let viewToUse = views[0];
+
+          if (gridPrefLastViewUsed) {
+            const found = views.find(
+              (v: any) => (v.Id || v.id) === gridPrefLastViewUsed
+            );
+            if (found) viewToUse = found;
           }
 
-          const refreshed = await apiClient.getObjViews(modeParams);
-          modeViews = filterViewsByGridType(refreshed, isTreeSubgridMode);
+          setSubgridViewOptionsForRelation(sObjectApiName, views);
+          setSubgridViewForRelation(sObjectApiName, viewToUse);
         }
 
-        let viewToUse = modeViews[0] || null;
-        if (gridPrefLastViewUsed) {
-          const found = modeViews.find(
-            (v: any) => (v?.Id || v?.id) === gridPrefLastViewUsed
-          );
-          if (found) viewToUse = found;
-        }
-
-        setSubgridViewOptionsForRelation(sObjectApiName, modeViews);
-        setSubgridViewForRelation(sObjectApiName, viewToUse);
-        viewsLoadedModeKeyRef.current = modeKey;
+        viewsLoadedRef.current = true;
         setInitialDataLoaded(true);
       } catch (error: any) {
         enqueueSnackbar(`Unexpected error loading views - ${error.message}`, {
@@ -1548,32 +1451,29 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
         })
 
         // Allow retry on next render
-        viewsLoadedModeKeyRef.current = '';
+        viewsLoadedRef.current = false;
       } finally {
-        loadingRelationsSet.delete(modeKey);
+        loadingRelationsSet.delete(sObjectApiName);
       }
     };
 
     run();
+    // Note: isActive is included to trigger the effect when the tab becomes active.
+    // We use shouldLoadRef and viewsLoadedRef to prevent duplicate runs.
+    // hasBeenActive is NOT included because shouldLoadRef handles that case.
   }, [
     action,
     apiClient,
+    createDefaultView,
     enqueueSnackbar,
-    filterViewsByGridType,
     gridApi,
     gridPrefLastViewUsed,
     gridPrefsLoaded,
     isActive,
-    isTreeSubgridMode,
-    relationName,
+    reloadViews,
     sObjectApiName,
-    selectedSubgridView,
-    setSubgridTreeGridPreferenceRecId,
-    setSubgridTreeGridPreferences,
     setSubgridViewForRelation,
     setSubgridViewOptionsForRelation,
-    showSubgridAdvancedFilter,
-    subgridFilterOptions,
     suspendSaves,
   ]);
 
@@ -1804,7 +1704,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
 
     if (!api) return;
 
-    const isTree = isTreeSubgridMode;
+    const isTree = (selectedSubgridType?.name === 'treeGrid') && (((relation as any)?.selectedGridType || 'gridView') === 'treeGrid');
 
     if (isTree) {
       const prefs: any = relationTreeGridPreferences as any;
@@ -2438,7 +2338,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
           saveAgGridState={saveAgGridState}
           selectedView={selectedSubgridView}
           onParentFieldsChange={handleParentFieldsChange}
-          setSelectedView={(v) => setSubgridViewForRelation(sObjectApiName, v as any)}
+          setSelectedView={setSelectedSubgridView}
         />
 
         {/* Grid Edit Dialog (Subgrid) */}
