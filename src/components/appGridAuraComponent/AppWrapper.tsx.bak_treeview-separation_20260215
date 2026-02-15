@@ -106,16 +106,6 @@ export interface AppHandle {
 }
 
 export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
-   const isTreeViewRecord = (view: any): boolean =>
-      Boolean(
-         view?.isTreeGridView ??
-         view?.isTreegridView ??
-         view?.AppGridAg__IsTreegridView__c ??
-         view?.AppGridAg__IsTreeGridView__c
-      );
-
-   const filterViewsByGridType = (views: any[] | undefined | null, treeMode: boolean) =>
-      (Array.isArray(views) ? views : []).filter((v) => isTreeViewRecord(v) === treeMode);
 
    // theme
    const mode = useThemeStore(s => s.mode);
@@ -430,21 +420,14 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
 
          // Fetch views fresh from API for the requested object (or use current viewOptions)
          const freshState = useStore.getState();
-         const targetTreeMode = (() => {
-            if (typeof data.payload?.isTreeGridView === 'boolean') {
-               return data.payload.isTreeGridView as boolean;
-            }
-            return (freshState as any)?.selectedGridType?.name === 'treeGrid';
-         })();
-         let searchViews = filterViewsByGridType(freshState.viewOptions as any[], targetTreeMode);
+         let searchViews = freshState.viewOptions;
          if (requestedObjectName) {
             try {
                const freshViews = await apiClient.getObjViews({
                   sObjectName: requestedObjectName,
-                  isSubgridView: false,
-                  isTreeGridView: targetTreeMode,
+                  isSubgridView: false
                });
-               searchViews = filterViewsByGridType(freshViews as any[], targetTreeMode);
+               searchViews = freshViews;
             } catch {
                data.resolve({ success: false, error: 'Failed to fetch views for object' });
                return;
@@ -491,18 +474,11 @@ export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
          }
 
          try {
-            const currentState = useStore.getState();
-            const treeMode =
-               typeof data.payload?.isTreeGridView === 'boolean'
-                  ? (data.payload.isTreeGridView as boolean)
-                  : (currentState as any)?.selectedGridType?.name === 'treeGrid';
-
             const views = await apiClient.getObjViews({
                sObjectName: data.payload.sObjectName as string,
-               isSubgridView: (data.payload.isSubgridView as boolean) ?? false,
-               isTreeGridView: treeMode,
+               isSubgridView: (data.payload.isSubgridView as boolean) ?? false
             });
-            data.resolve({ success: true, data: { views: filterViewsByGridType(views as any[], treeMode) } });
+            data.resolve({ success: true, data: { views } });
          } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to retrieve views';
             prettyPrint('[LMS] getViews error', error, 'red');

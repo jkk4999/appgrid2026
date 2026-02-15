@@ -425,7 +425,6 @@ export interface SObjectView {
   gridState?: string;
   id?: string;
   isSubgridView?: boolean;
-  isTreeGridView?: boolean;
   name?: string;
   pivotMode?: boolean;
   ownerId?: string;

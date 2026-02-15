@@ -32,12 +32,6 @@ const normalizeViewRecord = (view: unknown): SObjectView | null => {
     rowStyles: v.rowStyles ?? v.AppGridAg__Row_Styles__c ?? '',
     filterOptions: v.filterOptions ?? v.AppGridAg__FilterOptions__c ?? '',
     isSubgridView: Boolean(v.isSubgridView ?? v.AppGridAg__IsSubgridView__c),
-    isTreeGridView: Boolean(
-      v.isTreeGridView ??
-      v.isTreegridView ??
-      v.AppGridAg__IsTreegridView__c ??
-      v.AppGridAg__IsTreeGridView__c
-    ),
     pivotMode: Boolean(v.pivotMode ?? v.AppGridAg__Pivot_Mode__c),
     showAdvancedFilter: Boolean(
       v.showAdvancedFilter ?? v.AppGridAg__ShowAdvancedFilter__c

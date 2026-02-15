@@ -107,12 +107,7 @@ export interface AppHandle {
 
 export const AppWrapper = forwardRef<AppHandle, AppProps>((props, ref) => {
    const isTreeViewRecord = (view: any): boolean =>
-      Boolean(
-         view?.isTreeGridView ??
-         view?.isTreegridView ??
-         view?.AppGridAg__IsTreegridView__c ??
-         view?.AppGridAg__IsTreeGridView__c
-      );
+      Boolean(view?.isTreeGridView ?? view?.AppGridAg__IsTreeGridView__c);
 
    const filterViewsByGridType = (views: any[] | undefined | null, treeMode: boolean) =>
       (Array.isArray(views) ? views : []).filter((v) => isTreeViewRecord(v) === treeMode);

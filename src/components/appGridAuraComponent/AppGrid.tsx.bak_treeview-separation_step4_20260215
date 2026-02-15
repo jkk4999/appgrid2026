@@ -943,12 +943,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    const isTreeGrid = selectedGridType?.name === 'treeGrid';
    const isTreeViewRecord = useCallback((view: SObjectView | null | undefined) => {
       if (!view) return false;
-      return Boolean(
-         (view as any).isTreeGridView ??
-         (view as any).isTreegridView ??
-         (view as any).AppGridAg__IsTreegridView__c ??
-         (view as any).AppGridAg__IsTreeGridView__c
-      );
+      return Boolean((view as any).isTreeGridView ?? (view as any).AppGridAg__IsTreeGridView__c);
    }, []);
 
    const filterViewsByGridType = useCallback((views: SObjectView[] | null | undefined, treeMode: boolean) => {
@@ -1542,7 +1537,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles),
             AppGridAg__Row_Styles__c: JSON.stringify(extras.rowStyles),
             AppGridAg__IsSubgridView__c: false,
-            AppGridAg__IsTreegridView__c: isTreeGrid,
+            AppGridAg__IsTreeGridView__c: isTreeGrid,
             AppGridAg__Pivot_Mode__c: pivotMode,
             AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
             AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
@@ -3276,7 +3271,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
       const loadModeViews = async () => {
          try {
-            let createdDefaultTreeView = false;
             const modeParams: ObjViewParams = {
                sObjectName: selectedObjectApiName,
                isSubgridView: false,
@@ -3326,7 +3320,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                   AppGridAg__Column_Styles__c: JSON.stringify(storeState.objColumnStyles || []),
                   AppGridAg__Row_Styles__c: JSON.stringify(storeState.objRowStyles || []),
                   AppGridAg__IsSubgridView__c: false,
-                  AppGridAg__IsTreegridView__c: isTreeGrid,
+                  AppGridAg__IsTreeGridView__c: isTreeGrid,
                   AppGridAg__Pivot_Mode__c: false,
                   AppGridAg__FilterOptions__c: JSON.stringify(filterOptions || []),
                   AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
@@ -3340,9 +3334,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
                if (!(upsertResult.status === 'success' && upsertResult.results?.[0]?.isSuccess)) {
                   throw new Error(`Failed to create default ${isTreeGrid ? 'Tree Grid' : 'Grid'} view`);
-               }
-               if (isTreeGrid) {
-                  createdDefaultTreeView = true;
                }
 
                if (isTreeGrid) {
@@ -3376,13 +3367,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             const nextView = modeViews.find((v) => v.id && v.id === currentId) || modeViews[0] || null;
             setSelectedView(nextView as any);
             setSelectedViewRecordId(nextView?.id || '');
-            if (createdDefaultTreeView) {
-               enqueueSnackbar('Default treegrid view created', {
-                  action,
-                  variant: 'info',
-                  autoHideDuration: 3000,
-               });
-            }
          } catch (e: any) {
             prettyPrint('[AppGrid] Error loading mode-specific views', { message: e?.message, stack: e?.stack }, 'red');
             enqueueSnackbar(e?.message || 'Error loading views', { action, variant: 'error' });

@@ -133,7 +133,6 @@ export interface ObjQueryParams {
 export interface ObjViewParams {
   sObjectName: string;
   isSubgridView: boolean;
-  isTreeGridView?: boolean;
 }
 
 export interface ProjectHolidayParams {

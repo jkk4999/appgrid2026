@@ -943,12 +943,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    const isTreeGrid = selectedGridType?.name === 'treeGrid';
    const isTreeViewRecord = useCallback((view: SObjectView | null | undefined) => {
       if (!view) return false;
-      return Boolean(
-         (view as any).isTreeGridView ??
-         (view as any).isTreegridView ??
-         (view as any).AppGridAg__IsTreegridView__c ??
-         (view as any).AppGridAg__IsTreeGridView__c
-      );
+      return Boolean((view as any).isTreeGridView ?? (view as any).AppGridAg__IsTreeGridView__c);
    }, []);
 
    const filterViewsByGridType = useCallback((views: SObjectView[] | null | undefined, treeMode: boolean) => {
@@ -1542,7 +1537,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles),
             AppGridAg__Row_Styles__c: JSON.stringify(extras.rowStyles),
             AppGridAg__IsSubgridView__c: false,
-            AppGridAg__IsTreegridView__c: isTreeGrid,
+            AppGridAg__IsTreeGridView__c: isTreeGrid,
             AppGridAg__Pivot_Mode__c: pivotMode,
             AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
             AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
@@ -1807,11 +1802,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          fetchViews: async () => {
             setIsQueryActive(true);
 
-            const params: ObjViewParams = {
-               sObjectName: selectedObject!.qualifiedApiName,
-               isSubgridView: false,
-               isTreeGridView: isTreeGrid,
-            };
+            const params: ObjViewParams = { sObjectName: selectedObject!.qualifiedApiName, isSubgridView: false };
 
             const views = await apiRun(() => apiClient.getObjViews(params), { prefix: 'Load Views', rethrow: true });
             const filteredViews = filterViewsByGridType(views, isTreeGrid);
@@ -3276,32 +3267,19 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
       const loadModeViews = async () => {
          try {
-            let createdDefaultTreeView = false;
-            const modeParams: ObjViewParams = {
+            const params: ObjViewParams = {
                sObjectName: selectedObjectApiName,
                isSubgridView: false,
-               isTreeGridView: isTreeGrid,
             };
-            const modeViewsFromApi = await apiClient.getObjViews(modeParams);
-            let modeViews = filterViewsByGridType(modeViewsFromApi, isTreeGrid);
+            const allViews = await apiClient.getObjViews(params);
+            let modeViews = filterViewsByGridType(allViews, isTreeGrid);
 
             if (modeViews.length === 0) {
                const metadata = selectedObjMetadata || objMetadataMap.current.get(selectedObjectApiName) || null;
 
                let seedColumnState: any[] = [];
                if (isTreeGrid) {
-                  let regularViews: SObjectView[] = [];
-                  try {
-                     const regularParams: ObjViewParams = {
-                        sObjectName: selectedObjectApiName,
-                        isSubgridView: false,
-                        isTreeGridView: false,
-                     };
-                     const regularViewsFromApi = await apiClient.getObjViews(regularParams);
-                     regularViews = filterViewsByGridType(regularViewsFromApi, false);
-                  } catch {
-                     regularViews = [];
-                  }
+                  const regularViews = filterViewsByGridType(allViews, false);
                   const seedRegularView =
                      regularViews.find((v) => v.id && v.id === selectedView?.id) || regularViews[0] || null;
                   if (seedRegularView?.columnState) {
@@ -3326,7 +3304,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                   AppGridAg__Column_Styles__c: JSON.stringify(storeState.objColumnStyles || []),
                   AppGridAg__Row_Styles__c: JSON.stringify(storeState.objRowStyles || []),
                   AppGridAg__IsSubgridView__c: false,
-                  AppGridAg__IsTreegridView__c: isTreeGrid,
+                  AppGridAg__IsTreeGridView__c: isTreeGrid,
                   AppGridAg__Pivot_Mode__c: false,
                   AppGridAg__FilterOptions__c: JSON.stringify(filterOptions || []),
                   AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
@@ -3340,9 +3318,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
                if (!(upsertResult.status === 'success' && upsertResult.results?.[0]?.isSuccess)) {
                   throw new Error(`Failed to create default ${isTreeGrid ? 'Tree Grid' : 'Grid'} view`);
-               }
-               if (isTreeGrid) {
-                  createdDefaultTreeView = true;
                }
 
                if (isTreeGrid) {
@@ -3365,7 +3340,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                   }
                }
 
-               const refreshed = await apiClient.getObjViews(modeParams);
+               const refreshed = await apiClient.getObjViews(params);
                modeViews = filterViewsByGridType(refreshed, isTreeGrid);
             }
 
@@ -3376,13 +3351,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             const nextView = modeViews.find((v) => v.id && v.id === currentId) || modeViews[0] || null;
             setSelectedView(nextView as any);
             setSelectedViewRecordId(nextView?.id || '');
-            if (createdDefaultTreeView) {
-               enqueueSnackbar('Default treegrid view created', {
-                  action,
-                  variant: 'info',
-                  autoHideDuration: 3000,
-               });
-            }
          } catch (e: any) {
             prettyPrint('[AppGrid] Error loading mode-specific views', { message: e?.message, stack: e?.stack }, 'red');
             enqueueSnackbar(e?.message || 'Error loading views', { action, variant: 'error' });
@@ -3475,7 +3443,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                apiRun(() => apiClient.getObjQueries({ sObjectName: objName }), { prefix: 'Get Queries' }),
                apiRun(() => apiClient.getObjFlows({ sObjectName: objName }), { prefix: 'Get Flows' }),
                apiRun(() => apiClient.getObjCharts({ sObjectName: objName }), { prefix: 'Get Charts' }),
-               apiRun(() => apiClient.getObjViews({ sObjectName: objName, isSubgridView: false, isTreeGridView: isTreeGrid }), { prefix: 'Get Views' })
+               apiRun(() => apiClient.getObjViews({ sObjectName: objName, isSubgridView: false }), { prefix: 'Get Views' })
             ]);
 
             prettyPrint('[AppGrid] Parallel API calls completed', {
@@ -3663,8 +3631,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                // After creation, we must refetch the views to get the new one.
                const params: ObjViewParams = {
                   sObjectName: selectedObject!.qualifiedApiName!,
-                  isSubgridView: false,
-                  isTreeGridView: isTreeGrid,
+                  isSubgridView: false
                }
 
                // refreshing views

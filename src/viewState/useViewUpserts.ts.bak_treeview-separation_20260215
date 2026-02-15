@@ -9,7 +9,6 @@ export interface UseViewUpsertsParams {
   getGridApi: () => GridApi | null | undefined;
   sObjectApiName: string; // Qualified API name
   isSubgrid: boolean;
-  isTreeGridView?: boolean;
   // Normalized upsert that returns success + id
   upsert: (payload: any) => Promise<{ success: boolean; id: string; errorMessage?: string }>;
   // Component-specific view fetcher
@@ -90,7 +89,6 @@ export function useViewUpserts({
   getGridApi,
   sObjectApiName,
   isSubgrid,
-  isTreeGridView = false,
   upsert,
   fetchViews,
   setViewOptions,
@@ -160,7 +158,6 @@ export function useViewUpserts({
       AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles),
       AppGridAg__Row_Styles__c: JSON.stringify(extras.rowStyles),
       AppGridAg__IsSubgridView__c: isSubgrid,
-      AppGridAg__IsTreegridView__c: isTreeGridView,
       AppGridAg__Pivot_Mode__c: extras.pivotMode,
       AppGridAg__FilterOptions__c: JSON.stringify(extras.filterOptions),
       AppGridAg__ShowAdvancedFilter__c: extras.showAdvancedFilter,
@@ -175,7 +172,7 @@ export function useViewUpserts({
       throw new Error(`Upsert failed creating default view${details}`);
     }
     return result.id;
-  }, [getGridApi, getMetadata, hydrateExtras, isSubgrid, isTreeGridView, sObjectApiName, upsert]);
+  }, [getGridApi, getMetadata, hydrateExtras, isSubgrid, sObjectApiName, upsert]);
 
   const saveViewByName = useCallback(
     async (name: string): Promise<SObjectView | null> => {
@@ -205,7 +202,6 @@ export function useViewUpserts({
         AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles),
         AppGridAg__Row_Styles__c: JSON.stringify(extras.rowStyles),
         AppGridAg__IsSubgridView__c: isSubgrid,
-        AppGridAg__IsTreegridView__c: isTreeGridView,
         AppGridAg__Pivot_Mode__c: extras.pivotMode,
         AppGridAg__FilterOptions__c: JSON.stringify(extras.filterOptions),
         AppGridAg__ShowAdvancedFilter__c: extras.showAdvancedFilter,
@@ -243,7 +239,6 @@ export function useViewUpserts({
       hydrateExtras,
       getGridApi,
       isSubgrid,
-      isTreeGridView,
       sObjectApiName,
       setSelectedView,
       setViewOptions,
