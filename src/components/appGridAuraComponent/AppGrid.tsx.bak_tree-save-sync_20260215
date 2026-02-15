@@ -1579,80 +1579,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       },
    });
 
-   const saveCurrentModeGridState = useCallback(async (): Promise<string> => {
-      const baseResult = await saveAgGridState();
-      const didSaveSucceed =
-         baseResult === 'success' || baseResult === undefined || baseResult === null;
-
-      if (!didSaveSucceed) {
-         return baseResult;
-      }
-
-      if (!isTreeGrid || !gridApi || !selectedObject || !treeGridPreferences) {
-         return baseResult ?? 'success';
-      }
-
-      try {
-         const parentField =
-            (treeGridPreferences as any)?.AppGridAg__Parent_Lookup_Field__c ||
-            (treeGridPreferences as any)?.parentLookupField ||
-            '';
-         const groupField =
-            (treeGridPreferences as any)?.AppGridAg__Group_Field__c ||
-            (treeGridPreferences as any)?.groupField ||
-            '';
-
-         if (!parentField) {
-            return baseResult ?? 'success';
-         }
-
-         const columnState = gridApi.getColumnState();
-         const filterModel = gridApi.getFilterModel();
-         const advancedFilterModel = gridApi.getAdvancedFilterModel();
-         const prefsJson = JSON.stringify({ columnState, filterModel, advancedFilterModel });
-
-         const rec: any = {
-            AppGridAg__SObjectApiName__c: selectedObject.qualifiedApiName,
-            AppGridAg__Parent_Lookup_Field__c: parentField,
-            AppGridAg__Group_Field__c: groupField,
-            AppGridAg__IsSubgridView__c: false,
-            AppGridAg__Preferences__c: prefsJson,
-         };
-
-         const existingId = treeGridPreferenceRecId || (treeGridPreferences as any)?.Id;
-         if (existingId) {
-            rec.Id = existingId;
-         }
-
-         const res = await apiClient.upsertRecs({
-            sObjectName: 'AppGridAg__AG_TreeGrid_Prefs__c',
-            jsonRecs: JSON.stringify([rec]),
-         });
-
-         if (!(res.status === 'success' && res.results?.[0]?.isSuccess)) {
-            return 'Failed to save Tree Grid preferences';
-         }
-
-         const treePrefId = res.results?.[0]?.recordId || existingId || '';
-         if (treePrefId) {
-            setTreeGridPreferenceRecId(treePrefId);
-         }
-
-         setTreeGridPreferences({
-            ...(treeGridPreferences as any),
-            ...(treePrefId ? { Id: treePrefId, id: treePrefId } : {}),
-            AppGridAg__Preferences__c: prefsJson,
-            AppGridAg__Parent_Lookup_Field__c: parentField,
-            AppGridAg__Group_Field__c: groupField,
-         } as any);
-
-         return baseResult ?? 'success';
-      } catch (e: any) {
-         prettyPrint('[AppGrid] saveCurrentModeGridState failed', { message: e?.message, stack: e?.stack }, 'red');
-         return e?.message || 'Failed to save Tree Grid preferences';
-      }
-   }, [saveAgGridState, isTreeGrid, gridApi, selectedObject, treeGridPreferences, treeGridPreferenceRecId, apiClient, setTreeGridPreferenceRecId, setTreeGridPreferences]);
-
 
    /*==========================================
    ** CALLBACKS
@@ -5019,7 +4945,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                setPivot={setPivotFromManager}
                metadata={selectedObjMetadata ?? null}
                apiClient={apiClient}
-               saveAgGridState={saveCurrentModeGridState}
+               saveAgGridState={saveAgGridState}
                selectedView={selectedView}
                onParentFieldsChange={handleParentFieldsChange}
                setSelectedView={setSelectedView}
