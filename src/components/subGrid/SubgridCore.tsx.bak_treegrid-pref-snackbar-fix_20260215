@@ -850,10 +850,7 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
         const latestStore = useStore.getState();
         const liveSubgridType = latestStore.selectedSubgridType?.name || selectedSubgridType?.name;
         const liveRelationType = ((relation as any)?.selectedGridType || relType || 'gridView').toLowerCase().replace(/\s+/g, '');
-        // Only show this prompt on explicit/manual refresh requests.
-        // During automatic mode-switch initialization we may auto-create a default
-        // tree view, and this snackbar is confusing/noisy in that path.
-        if (force && liveRelationType === 'treegrid' && liveSubgridType === 'treeGrid') {
+        if (liveRelationType === 'treegrid' && liveSubgridType === 'treeGrid') {
           enqueueSnackbar(`No Tree Grid preferences found for ${sObjectApiName}`, {
             action: (snackbarId) => (
               <>
