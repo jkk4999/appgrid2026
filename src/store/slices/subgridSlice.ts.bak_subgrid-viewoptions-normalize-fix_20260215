@@ -155,15 +155,14 @@ export const createSubgridSlice: StateCreator<
     set((state) => {
       const prevOptions =
         state.subgridViewOptionsByRelation[relationName] || [];
-      const nextOptions =
-        typeof updater === 'function'
-          ? updater(prevOptions)
-          : updater;
       return {
         ...state,
         subgridViewOptionsByRelation: {
           ...state.subgridViewOptionsByRelation,
-          [relationName]: normalizeViewArray(nextOptions) || []
+          [relationName]:
+            typeof updater === 'function'
+              ? updater(prevOptions)
+              : normalizeViewArray(updater) || []
         }
       };
     }),
