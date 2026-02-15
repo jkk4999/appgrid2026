@@ -744,9 +744,9 @@ const SubgridCore: React.FC<SubgridCoreProps> = ({
 
       // Existing view save: update local selected view and relation view-options
       // so switching away/back does not show stale state.
-      // IMPORTANT: do NOT set selected view here; that retriggers view-apply
-      // and can snap columns back while user is interacting.
       if (id && currentView && payload) {
+        const mergedView = { ...currentView, ...payload, id, Id: id } as any;
+        setSubgridViewForRelation(sObjectApiName, mergedView);
         setSubgridViewOptionsForRelation(sObjectApiName, (prev: any[]) =>
           (Array.isArray(prev) ? prev : []).map((v: any) =>
             (v?.id || v?.Id) === id ? { ...v, ...payload, id, Id: id } : v
