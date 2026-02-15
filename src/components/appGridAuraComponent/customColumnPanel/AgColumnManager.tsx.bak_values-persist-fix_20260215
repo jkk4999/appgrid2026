@@ -466,14 +466,8 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
         .filter(Boolean) || [];
     }
 
-    // Values/aggregations: derive from column state first to avoid stale API list behavior
-    let v = (columnState || [])
-      .filter((c: any) => c && c.colId && c.aggFunc !== undefined && c.aggFunc !== null && c.aggFunc !== '')
-      .map((c: any) => c.colId)
-      .filter(Boolean);
-    if (!v.length) {
-      v = (gridApi.getValueColumns?.() || []).map((c: any) => c.getColId?.() || c.colId).filter(Boolean);
-    }
+    // Values/aggregations: use API (these work correctly)
+    const v = (gridApi.getValueColumns?.() || []).map((c: any) => c.getColId?.() || c.colId).filter(Boolean);
 
     // Pivot columns: prefer gridState.pivot.pivotColIds, fallback to API
     let p = gridState?.pivot?.pivotColIds || [];
@@ -699,20 +693,12 @@ export default function AgColumnManager({ open, onClose, gridApi, setPivot, meta
       return;
     }
 
-    // Values: clear agg on non-value cols, then set value cols deterministically
+    // Values: apply via applyColumnState to set aggFunc if needed later
     const vIds = effectiveValues.map((x) => x.id);
-    const allState: any[] = gridApi.getColumnState?.() || [];
-    const vSet = new Set(vIds);
-    const clearAggState = allState
-      .filter((s: any) => s?.colId && !vSet.has(String(s.colId)))
-      .map((s: any) => ({ colId: s.colId, aggFunc: null as any }));
-    const setAggState = vIds.map((colId) => {
-      const prev = allState.find((s: any) => s?.colId === colId);
-      return { colId, aggFunc: prev?.aggFunc || 'sum' };
-    });
-    // setValueColumns is the authoritative API for active value columns.
-    (gridApi as any).setValueColumns?.(vIds);
-    gridApi.applyColumnState?.({ state: [...clearAggState, ...setAggState], applyOrder: false });
+
+    const state = vIds.map((colId) => ({ colId, aggFunc: 'sum' }));
+
+    gridApi.applyColumnState?.({ state, defaultState: { aggFunc: undefined }, applyOrder: false });
 
     if (!effectivePivotMode) {
       const destIds = effectiveAvailable.map((x) => x.id);
