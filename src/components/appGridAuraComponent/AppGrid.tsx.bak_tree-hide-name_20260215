@@ -872,10 +872,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
    // Track when first data has been rendered and auto-sizing is complete
    // This prevents saves during initial grid setup
    const firstDataRenderedCompleteRef = useRef(false);
-   const treeGroupSourceVisibilityRef = useRef<{ field: string | null; wasVisible: boolean | null }>({
-      field: null,
-      wasVisible: null,
-   });
 
    const prevSelectedObject = useRef<OrgObject>(null);
 
@@ -1626,17 +1622,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       }
    }, [enforceControlColumnsOrder]);
 
-   const enforceTreeHierarchySourceHidden = useCallback((api: any) => {
-      const apiAny = api as any;
-      if (!apiAny || apiAny.isDestroyed?.()) return;
-      if (!treeDataActive) return;
-
-      const tracked = treeGroupSourceVisibilityRef.current;
-      if (tracked.field) {
-         apiAny.setColumnsVisible?.([tracked.field], false);
-      }
-   }, [treeDataActive]);
-
 
    const onColumnMoved = useCallback(
       (event: ColumnMovedEvent) => {
@@ -2255,18 +2240,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                }
 
             }
-
-            const groupSourceCol = (gridApi as any).getColumn?.(resolvedGroupField);
-            if (groupSourceCol) {
-               const tracked = treeGroupSourceVisibilityRef.current;
-               if (tracked.field !== resolvedGroupField) {
-                  treeGroupSourceVisibilityRef.current = {
-                     field: resolvedGroupField,
-                     wasVisible: groupSourceCol.isVisible?.() ?? true,
-                  };
-               }
-               (gridApi as any).setColumnsVisible?.([resolvedGroupField], false);
-            }
          }
       } else {
          // Return to flat grid mode
@@ -2296,12 +2269,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
          // Restore the user's grouping display preference (e.g., multipleColumns)
          gridApi.setGridOption('groupDisplayType', groupDisplayType);
-
-         const tracked = treeGroupSourceVisibilityRef.current;
-         if (tracked.field) {
-            (gridApi as any).setColumnsVisible?.([tracked.field], tracked.wasVisible ?? true);
-            treeGroupSourceVisibilityRef.current = { field: null, wasVisible: null };
-         }
 
          setTreeDataActive(false);
       }
@@ -4666,10 +4633,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                         onColumnPivotModeChanged={gridEvents.onColumnPivotModeChanged}
                         onColumnPivotChanged={gridEvents.onColumnPivotChanged}
                         onColumnResized={gridEvents.onColumnResized}
-                        onColumnVisible={() => {
-                           gridEvents.onColumnVisible();
-                           enforceTreeHierarchySourceHidden(gridApiRef.current || gridApi);
-                        }}
+                        onColumnVisible={gridEvents.onColumnVisible}
                         onColumnPinned={gridEvents.onColumnPinned}
                         onFilterChanged={gridEvents.onFilterChanged}
                         onSortChanged={gridEvents.onSortChanged}
@@ -4680,7 +4644,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                         onStateUpdated={(event) => {
                            gridEvents.onStateUpdated(event);
                            syncEditColumnVisibilityWithGrouping(event.api);
-                           enforceTreeHierarchySourceHidden(event.api);
                         }}
                         pivotMode={pivotMode}
                         rowData={rowData}
