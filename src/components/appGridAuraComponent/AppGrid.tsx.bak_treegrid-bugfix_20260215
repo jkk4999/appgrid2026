@@ -1524,10 +1524,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          };
       },
       buildUpsertPayload: (gridState, colState, extras) => {
-         const selectedViewTreeFlag =
-            selectedView != null
-               ? isTreeViewRecord(selectedView as any)
-               : isTreeGrid;
          // Embed saved filter templates into gridState to avoid duplicative fields
          const nextGridState = {
             ...(gridState || {}),
@@ -1546,7 +1542,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             AppGridAg__Column_Styles__c: JSON.stringify(extras.columnStyles),
             AppGridAg__Row_Styles__c: JSON.stringify(extras.rowStyles),
             AppGridAg__IsSubgridView__c: false,
-            AppGridAg__IsTreegridView__c: selectedViewTreeFlag,
+            AppGridAg__IsTreegridView__c: isTreeGrid,
             AppGridAg__Pivot_Mode__c: pivotMode,
             AppGridAg__ShowAdvancedFilter__c: showAdvancedFilter,
             AppGridAg__Parent_Fields__c: parentFieldsJsonRef.current || '',
@@ -3385,8 +3381,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                   action,
                   variant: 'info',
                   autoHideDuration: 3000,
-                  preventDuplicate: false,
-                  key: `default-treegrid-view-created-${Date.now()}`,
                });
             }
          } catch (e: any) {
