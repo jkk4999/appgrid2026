@@ -1303,7 +1303,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
 
    const renderAutoGroupInnerCell = useCallback((params: any) => {
       const label = params.value ?? params.data?.Name ?? '';
-      const hasRowGrouping = (params.api?.getRowGroupColumns?.() || []).length > 0;
 
       if (params.node?.group) {
          return label;
@@ -1317,31 +1316,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       const recordId = params.data?.Id;
       if (!recordId) {
          return label;
-      }
-
-      // In row-group mode, keep leaf group cell compact so grouped fields are not duplicated.
-      if (hasRowGrouping && !treeDataActive) {
-         return (
-            <Tooltip title="Edit" arrow>
-               <IconButton
-                  size="small"
-                  onClick={(e) => {
-                     e.stopPropagation();
-                     emitEditRecord({
-                        context: 'main',
-                        gridId,
-                        recordId: String(recordId),
-                     });
-                  }}
-                  sx={{
-                     padding: '2px',
-                     '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
-                  }}
-               >
-                  <EditOutlinedIcon sx={{ fontSize: '16px', color: 'inherit' }} />
-               </IconButton>
-            </Tooltip>
-         );
       }
 
       return (
@@ -1368,7 +1342,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             <span>{label}</span>
          </Box>
       );
-   }, [gridId, treeDataActive]);
+   }, [gridId]);
 
    // Default autoGroupColumnDef for non-tree grid modes (row grouping)
    // Tree grid mode sets its own autoGroupColumnDef dynamically with the field property
