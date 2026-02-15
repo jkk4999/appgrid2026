@@ -126,7 +126,6 @@ import { useFilterTemplates } from '../../hooks/useFilterTemplates';
 import useDebugLog from '../../hooks/useDebugLog';
 import { useViewUpserts } from '../../viewState/useViewUpserts';
 import { RUN_QUERY } from '../../viewState/topics';
-import { emitEditRecord } from '../../events/topics';
 import { useRecordSaver } from '../../hooks/useRecordSaver';
 import { useEditRecordGuard } from '../../hooks/useEditRecordGuard';
 import { useAddGridRow } from '../../hooks/useAddGridRow';
@@ -280,7 +279,6 @@ import SaveIcon from '@mui/icons-material/CheckOutlined';
 import SaveAsOutlinedIcon from '@mui/icons-material/SaveAsOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 
 import AgColumnManager from './customColumnPanel/AgColumnManager';
 
@@ -1301,49 +1299,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       }
    }, [gridApi, chartRef, setUseAllChartData, enqueueSnackbar]);
 
-   const renderAutoGroupInnerCell = useCallback((params: any) => {
-      const label = params.value ?? params.data?.Name ?? '';
-
-      if (params.node?.group) {
-         return label;
-      }
-
-      const editVisible = params.api?.getColumn?.('editAction')?.isVisible?.() ?? true;
-      if (editVisible) {
-         return label;
-      }
-
-      const recordId = params.data?.Id;
-      if (!recordId) {
-         return label;
-      }
-
-      return (
-         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Tooltip title="Edit" arrow>
-               <IconButton
-                  size="small"
-                  onClick={(e) => {
-                     e.stopPropagation();
-                     emitEditRecord({
-                        context: 'main',
-                        gridId,
-                        recordId: String(recordId),
-                     });
-                  }}
-                  sx={{
-                     padding: '2px',
-                     '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
-                  }}
-               >
-                  <EditOutlinedIcon sx={{ fontSize: '16px', color: 'inherit' }} />
-               </IconButton>
-            </Tooltip>
-            <span>{label}</span>
-         </Box>
-      );
-   }, [gridId]);
-
    // Default autoGroupColumnDef for non-tree grid modes (row grouping)
    // Tree grid mode sets its own autoGroupColumnDef dynamically with the field property
    const autoGroupColumnDef = useMemo<ColDef>(() => ({
@@ -1359,9 +1314,14 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       cellRenderer: 'agGroupCellRenderer',
       cellRendererParams: {
          suppressCount: true,
-         innerRenderer: renderAutoGroupInnerCell,
+         innerRenderer: (params: any) => {
+            if (params.node?.group || params.node?.level >= 0) {
+               return params.value;
+            }
+            return params.data?.Name ?? '';
+         },
       },
-   }), [renderAutoGroupInnerCell]);
+   }), []);
 
    const handleMassEditColumn = useCallback((column: any) => {
       // Blur ANY focused grid element (this clears header focus)
@@ -1579,21 +1539,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       }
    }, []);
 
-   const syncEditColumnVisibilityWithGrouping = useCallback((api: any) => {
-      const apiAny = api as any;
-      if (!apiAny || apiAny.isDestroyed?.()) return;
-
-      const rowGroupCols = apiAny.getRowGroupColumns?.() || [];
-      const hasRowGrouping = rowGroupCols.length > 0;
-      const showEditColumn = !hasRowGrouping;
-
-      apiAny.setColumnsVisible?.(['editAction'], showEditColumn);
-
-      if (showEditColumn) {
-         enforceControlColumnsOrder(apiAny);
-      }
-   }, [enforceControlColumnsOrder]);
-
 
    const onColumnMoved = useCallback(
       (event: ColumnMovedEvent) => {
@@ -1611,7 +1556,6 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
       requestAnimationFrame(() => {
          setTimeout(() => {
             if ((params.api as any).isDestroyed?.()) return;
-            syncEditColumnVisibilityWithGrouping(params.api);
             enforceControlColumnsOrder(params.api);
 
             const allColumnIds = params.api.getColumns()?.map(col => col.getColId()) || [];
@@ -1625,7 +1569,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             }, 200);
          }, 50);
       });
-   }, [enforceControlColumnsOrder, syncEditColumnVisibilityWithGrouping]);
+   }, [enforceControlColumnsOrder]);
 
    // Note: Auto-sizing columns on every rowData change was removed to improve performance.
    // The onFirstDataRendered callback handles initial auto-sizing.
@@ -2182,7 +2126,12 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                cellRenderer: 'agGroupCellRenderer',
                cellRendererParams: {
                   suppressCount: true,
-                  innerRenderer: renderAutoGroupInnerCell,
+                  innerRenderer: (params: any) => {
+                     if (params.node?.group || params.node?.level >= 0) {
+                        return params.value;
+                     }
+                     return params.data?.Name ?? '';
+                  },
                },
             });
 
@@ -2230,7 +2179,12 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
             cellRenderer: 'agGroupCellRenderer',
             cellRendererParams: {
                suppressCount: true,
-               innerRenderer: renderAutoGroupInnerCell,
+               innerRenderer: (params: any) => {
+                  if (params.node?.group || params.node?.level >= 0) {
+                     return params.value;
+                  }
+                  return params.data?.Name ?? '';
+               },
             },
          });
 
@@ -2245,9 +2199,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
          setTreeDataActive(false);
       }
 
-      syncEditColumnVisibilityWithGrouping(gridApi);
-
-   }, [enforceControlColumnsOrder, gridApi, isTreeGrid, treeGridPreferences, groupDisplayType, selectedObjMetadata, setShowAdvancedFilter, setTreeGridPreferences, theme.palette.text.primary, renderAutoGroupInnerCell, syncEditColumnVisibilityWithGrouping]);
+   }, [enforceControlColumnsOrder, gridApi, isTreeGrid, treeGridPreferences, groupDisplayType, selectedObjMetadata, setShowAdvancedFilter, setTreeGridPreferences, theme.palette.text.primary]);
 
    // Fetch TreeGrid preferences when switching to Tree Grid view
    useEffect(() => {
@@ -4597,10 +4549,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                         onCellValueChanged={onCellValueChanged}
                         onColumnMoved={onColumnMoved}
                         // onCellContextMenu={onCellContextMenu}
-                        onColumnRowGroupChanged={(event) => {
-                           gridEvents.onColumnRowGroupChanged();
-                           syncEditColumnVisibilityWithGrouping(event.api);
-                        }}
+                        onColumnRowGroupChanged={gridEvents.onColumnRowGroupChanged}
                         onColumnValueChanged={gridEvents.onColumnValueChanged}
                         onColumnPivotModeChanged={gridEvents.onColumnPivotModeChanged}
                         onColumnPivotChanged={gridEvents.onColumnPivotChanged}
@@ -4613,10 +4562,7 @@ export const AppGrid = ({ initialData, size, apiClient }: AppProps & { size: Siz
                         onFirstDataRendered={onFirstDataRendered}
                         onRowGroupOpened={onRowGroupOpened}
                         onRowSelected={onRowSelected}
-                        onStateUpdated={(event) => {
-                           gridEvents.onStateUpdated(event);
-                           syncEditColumnVisibilityWithGrouping(event.api);
-                        }}
+                        onStateUpdated={gridEvents.onStateUpdated}
                         pivotMode={pivotMode}
                         rowData={rowData}
                         rowSelection={rowSelection}

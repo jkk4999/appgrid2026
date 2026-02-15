@@ -42,9 +42,11 @@ See full diagram:
 - One immutable frontend build is distributed across orgs; deployment/change control and rollback evidence should be attached if exception path is used.
 
 ### 3.4 Slack Integration Controls
+- Purpose: provide record-context collaboration by showing related Slack channel and DM messages inside AppGrid; not a replacement for Salesforce Slack applications.
 - Slack integration uses OAuth-based token model with encrypted token storage.
 - Missing/revoked/expired token paths are handled with explicit failure responses.
 - Slack integration has enable/disable configuration controls.
+- Slack integration is optional and System Administrator controlled; user access is permission-gated (AppGrid Slack permission).
 
 ## 4. Data Handling Summary
 

@@ -6,23 +6,16 @@ Prepared date: February 14, 2026
 
 Q: Describe application architecture.
 A: AppGrid runs as a Salesforce managed package using an LWC host that renders a React frontend. Business/data operations execute through Apex. Slack integration is handled server-side via Apex callouts.
-Evidence:
-- `appExchange docs/AppExchange_Architecture_Diagram.md`
-- `AgGrid2025GA/force-app/main/default/lwc/appGridLwc/appGridLwc.js`
-- `AgGrid2025GA/force-app/main/default/classes/AppGridController.cls`
+
 
 ## 2. External Hosting and Third-Party Services
 
 Q: Does the app load externally hosted code?
-A: Current architecture references static React assets from `https://www.appgridlwc.com` (Cloudflare-backed delivery).  
-Security review alignment note: This submission uses an explicit external-hosting architecture with documented compensating controls and reviewer evidence.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/lwc/appGridLwc/appGridLwc.js:107`
-- `AgGrid2025GA/force-app/main/default/remoteSiteSettings/AppGrid_Cloudflare.remoteSite-meta.xml`
-- `AgGrid2025GA/force-app/main/default/cspTrustedSites/AppGrid_Cloudflare.cspTrustedSite-meta.xml`
+A: Yes.  This app loads a static React bundle from Cloudflare. To reduce risk, the design uses strict origin allowlists, iframe isolation, postMessage origin/source validation, and no external access or storage of Salesforce customer records.
 
 Q: Why was Cloudflare used for React assets?
-A: Cloudflare is used only as a static asset origin for the isolated React iframe runtime. This design keeps the React bundle outside Salesforce metadata limits while preserving one audited frontend build across customer orgs.  
+A: Cloudflare is used only as a static asset origin for the isolated React iframe runtime. The frontend bundle is approximately 11 MB uncompressed, and this architecture preserves a single audited frontend build across customer orgs while improving static asset caching and delivery at the edge. Salesforce remains the system of record, and business/data logic stays in Apex/LWC.
+
 Security containment model:
 - External runtime is isolated in an iframe on a separate origin.
 - Salesforce remains system of record; no customer business data is stored externally.
@@ -34,30 +27,34 @@ Exception statement for reviewers:
 - External hosting is an intentional architecture decision for this runtime and is submitted as a documented exception with compensating controls.
 - Evidence package includes integrity/change controls (immutable versioning, controlled deployment, rollback procedure, and release-version traceability).
 
-Q: Does Cloudflare store Salesforce customer business data?
-A: Intended model is static asset delivery only; Salesforce data processing remains in LWC/Apex/SObjects.
+Q: Does Cloudflare store or access Salesforce customer business data?
+A: No.  Intended model is static asset delivery only; Salesforce data processing remains in LWC/Apex/SObjects.
 Action to finalize before submission:
 - Add explicit Cloudflare privacy statement and change-control note.
 
 Q: What external APIs are used?
 A: Slack Web API over HTTPS/TLS through Apex callouts.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/classes/AgSlackService.cls`
-- `AgGrid2025GA/force-app/main/default/remoteSiteSettings/Slack_API.remoteSite-meta.xml`
+
+Q: What is the purpose of the Slack integration?
+A: The Slack integration allows users to view Slack channel and direct-message context related to the selected Salesforce record to support collaboration within AppGrid. It is not intended to replace Salesforce Slack applications.
+
 
 ## 3. Authentication and Authorization
 
 Q: How are record-level permissions enforced?
 A: Core Apex controllers/services run `with sharing` with user-mode query/DML patterns.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/classes/AppGridController.cls:240`
-- `AgGrid2025GA/force-app/main/default/classes/AppGridController.cls` (`WITH USER_MODE`, `AccessLevel.USER_MODE` usage)
+
+Q: How are object-level and field-level permissions enforced?
+A: Object and field permissions are enforced using Salesforce user-mode access patterns for query and data operations. Apex execution paths are designed so user context controls accessible objects/fields, and access failures are handled as authorization errors.
+
+Q: How are DML permissions checked?
+A: DML operations are executed in user mode (`AccessLevel.USER_MODE`) so create/update/delete rights are enforced by Salesforce CRUD/FLS rules for the running user before data is committed.
 
 Q: How is Slack authentication handled?
 A: OAuth flow via Slack authorization endpoint, callback processing in Salesforce, token state checks, and revoke flow.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/classes/AgSlackUserOAuthController.cls`
-- `AgGrid2025GA/docs/SLACK_AUTHENTICATION_FLOW.md`
+
+Q: Is Slack integration optional, and who can enable or use it?
+A: Yes. Slack integration is an optional feature configured and enabled by Salesforce System Administrators. After admin setup, access is user-level gated: only users granted the AppGrid Slack permission can use Slack features.
 
 Q: Are OAuth scopes least privilege?
 A: Scope list is implemented but requires explicit scope-to-feature minimization narrative for submission.
@@ -93,24 +90,16 @@ Evidence:
 
 Q: How is iframe messaging protected?
 A: LWC validates message source window and origin allowlist before processing requests.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/lwc/appGridLwc/appGridLwc.js:348`
-- `AgGrid2025GA/force-app/main/default/lwc/appGridLwc/appGridLwc.js:355`
+
 
 Q: How does app fail when external auth is missing/invalid?
 A: Controlled error paths exist for missing token, unauthorized token, and missing scope.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/classes/AgSlackService.cls:789`
-- `AgGrid2025GA/force-app/main/default/classes/AgSlackService.cls:840`
-- `AgGrid2025GA/force-app/main/default/classes/AgSlackService.cls:878`
 
 ## 7. Secure Defaults
 
 Q: Are external integrations secure by default?
 A: Partially. Some Slack feature toggles default disabled (`Enabled__c=false`), but `Ag_Slack_Config__c.Is_Active__c` default is true and should be reviewed for strict default-off posture.
-Evidence:
-- `AgGrid2025GA/force-app/main/default/objects/Ag_Slack_Object_Config__c/fields/Enabled__c.field-meta.xml`
-- `AgGrid2025GA/force-app/main/default/objects/Ag_Slack_Config__c/fields/Is_Active__c.field-meta.xml`
+
 
 ## 8. Scanner and Testing Artifacts
 
